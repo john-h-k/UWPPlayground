@@ -5,7 +5,7 @@ using TerraFX.Interop;
 namespace UWPPlayground.Common.d3dx12
 {
     [SuppressMessage("ReSharper", "InconsistentNaming")]
-    public unsafe static class CD3DX12_CPU_DESCRIPTOR_HANDLE
+    public static unsafe class CD3DX12_CPU_DESCRIPTOR_HANDLE
     {
         public static D3D12_CPU_DESCRIPTOR_HANDLE Create(in D3D12_CPU_DESCRIPTOR_HANDLE o)
         {

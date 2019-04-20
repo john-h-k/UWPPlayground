@@ -1,42 +1,51 @@
 ﻿using UWPPlayground.Common;
+using UWPPlayground.Content;
 
 namespace UWPPlayground
 {
     public class UWPDirectXMain
     {
+        private Sample3DSceneRenderer _sceneRenderer;
+        private StepTimer _timer = StepTimer.Create();
+
         public void Update()
         {
-            throw new System.NotImplementedException();
+            _timer.Tick(() => _sceneRenderer.Update(ref _timer));
         }
 
         public bool Render()
         {
-            throw new System.NotImplementedException();
+            if (_timer.FrameCount == 0)
+                return false;
+
+            return _sceneRenderer.Render();
         }
 
         public void OnSuspending()
         {
-            throw new System.NotImplementedException();
+            _sceneRenderer.SaveState();
         }
 
         public void OnResuming()
         {
-            throw new System.NotImplementedException();
+
         }
 
         public void OnWindowSizeChanged()
         {
-            throw new System.NotImplementedException();
+            _sceneRenderer.CreateWindowSizeDependentResources();
         }
 
         public void OnDeviceRemoved()
         {
-            throw new System.NotImplementedException();
+            _sceneRenderer.SaveState();
+            _sceneRenderer = null;
         }
 
         public void CreateRenderers(DeviceResources deviceResources)
         {
-            throw new System.NotImplementedException();
+            _sceneRenderer = new Sample3DSceneRenderer(deviceResources);
+            OnWindowSizeChanged();
         }
     }
 }

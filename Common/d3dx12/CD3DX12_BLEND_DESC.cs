@@ -31,7 +31,7 @@ namespace UWPPlayground.Common.d3dx12
            D3D12_LOGIC_OP LogicOp;
            UINT8 RenderTargetWriteMask;
          */
-        private static D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = new D3D12_RENDER_TARGET_BLEND_DESC
+        private static readonly D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = new D3D12_RENDER_TARGET_BLEND_DESC
         {
             BlendEnable = FALSE,
             LogicOpEnable = FALSE,
@@ -42,14 +42,14 @@ namespace UWPPlayground.Common.d3dx12
             DestBlendAlpha = D3D12_BLEND_ZERO,
             BlendOpAlpha = D3D12_BLEND_OP_ADD,
             LogicOp = D3D12_LOGIC_OP_NOOP,
-            RenderTargetWriteMask = (byte) D3D12_COLOR_WRITE_ENABLE_ALL
+            RenderTargetWriteMask = (byte)D3D12_COLOR_WRITE_ENABLE_ALL
         };
 
         private static D3D12_RENDER_TARGET_BLEND_DESC def => defaultRenderTargetBlendDesc;
 
         public static D3D12_BLEND_DESC Create(CD3DX12_DEFAULT _)
         {
-            
+
             var obj = new D3D12_BLEND_DESC
             {
                 AlphaToCoverageEnable = FALSE,
@@ -65,4 +65,3 @@ namespace UWPPlayground.Common.d3dx12
         }
     }
 }
-    

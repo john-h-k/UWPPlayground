@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using TerraFX.Interop;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
@@ -13,7 +15,17 @@ using UWPPlayground.Common.d3dx12;
 using static UWPPlayground.Common.DirectXHelper;
 using static TerraFX.Interop.D3DCommon;
 using static TerraFX.Interop.D3D12;
+using static TerraFX.Interop.Windows;
 using static TerraFX.Interop.D3D12_ROOT_SIGNATURE_FLAGS;
+using UWPPlayground.Common;
+using UWPPlayground.Common.d3dx12;
+using static TerraFX.Interop.DXGI_FORMAT;
+using static TerraFX.Interop.D3D12_INPUT_CLASSIFICATION;
+using static UWPPlayground.Common.d3dx12.CD3DX12_DEFAULT;
+using static UWPPlayground.Common.DirectXHelper;
+using static TerraFX.Interop.D3D12;
+using Size = Windows.Foundation.Size;
+using D3D12_RECT = TerraFX.Interop.RECT;
 
 namespace UWPPlayground.Content
 {
@@ -80,7 +92,7 @@ namespace UWPPlayground.Content
                     D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
                     D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
 
-                 CD3DX12_ROOT_SIGNATURE_DESC.Init(out D3D12_ROOT_SIGNATURE_DESC descRootSignature, 1, &parameter, 0, null, rootSignatureFlags);
+                CD3DX12_ROOT_SIGNATURE_DESC.Init(out D3D12_ROOT_SIGNATURE_DESC descRootSignature, 1, &parameter, 0, null, rootSignatureFlags);
 
                 ID3DBlob* pSignature;
                 ID3DBlob* pError;
@@ -101,51 +113,194 @@ namespace UWPPlayground.Content
                         &iid,
                         (void**)p
                     ));
-                    NameObject(_rootSignature, nameof(_rootSignature));
 
+                    NameObject(_rootSignature, nameof(_rootSignature));
                 }
             }
 
-            var vertexShaderLen = (IntPtr)new FileInfo("SampleVertexShader.cs").Length;
-            IntPtr vertexShaderMem = Marshal.AllocHGlobal(vertexShaderLen);
-            _vertexShader = new UnmanagedSpan<byte>((void*)vertexShaderMem, (int)vertexShaderLen, 
-                () => Marshal.FreeHGlobal(vertexShaderMem) // TODO better alternative?
-                );
 
-            var pixelShaderLen = (IntPtr)new FileInfo("SamplePixelShader.cs").Length;
-            IntPtr pixelShaderMem = Marshal.AllocHGlobal(vertexShaderLen);
-            _vertexShader = new UnmanagedSpan<byte>((void*)pixelShaderMem, (int)pixelShaderLen,
-                () => Marshal.FreeHGlobal(pixelShaderMem) // TODO better alternative?
-                );
+
+            ReadPixelShader();
+            ReadVertexShader();
+            CreatePipelineState();
+            CreateRendererAssets();
         }
+
+
 
         public void CreateWindowSizeDependentResources()
         {
+            Size outputSize = _deviceResources.GetOutputSize();
+            float aspectRatio = (float)outputSize.Width / (float)outputSize.Height;
+            float fovAngleY = 70.0F * (float)Math.PI / 180.0F;
+
+            D3D12_VIEWPORT viewport = _deviceResources.GetScreenViewport();
+
+            _scissorRect = new D3D12_RECT
+            {
+                left = 0,
+                top = 0,
+                right = (int)viewport.Width,
+                bottom = (int)viewport.Height
+            };
+
+            if (aspectRatio < 1)
+            {
+                fovAngleY *= 2;
+            }
+
+            Matrix4x4 perspectiveMatrix = Matrix4x4.CreatePerspectiveFieldOfView(
+                fovAngleY,
+                aspectRatio,
+                0.01F,
+                100.0F
+                );
+
+            Matrix4x4 orientation = _deviceResources.GetOrientationTransform3D();
+            _constantBufferData.projection = Matrix4x4.Transpose(perspectiveMatrix * orientation);
+
+            _constantBufferData.view = Matrix4x4.Transpose(Matrix4x4.CreateLookAt(_eye, _at, _up));
+        }
+        private static readonly Vector3 _eye = new Vector3(0.0F, 0.7F, 1.5F);
+        private static readonly Vector3 _at = new Vector3(0.0F, -0.1F, 0.0F);
+        private static readonly Vector3 _up = new Vector3(0.0F, 1.0F, 0.0F);
+
+        public unsafe void Update(ref StepTimer timer)
+        {
+            if (_loadingComplete)
+            {
+                if (!_tracking && _rotating)
+                {
+                    float angle = (float)timer.ElapsedSeconds * _radiansPerSecond;
+                    _rotationY += angle;
+                    Rotate(_rotationY);
+                }
+
+                byte* destination = _mappedConstantBuffer
+                                    + (_deviceResources.GetCurrentFrameIndex() * AlignedConstantBufferSize);
+
+                Unsafe.CopyBlockUnaligned(ref *destination,
+                    ref Unsafe.As<ModelViewProjectionConstantBuffer, byte>(ref _constantBufferData),
+                    (uint)sizeof(ModelViewProjectionConstantBuffer));
+            }
         }
 
-        public void Update(ref StepTimer timer)
+        public unsafe bool Render()
         {
-        }
+            if (!_loadingComplete)
+                return false;
 
-        public bool Render()
-        {
-            throw null;
+            ThrowIfFailed(_deviceResources.GetCommandAllocator()->Reset());
+
+            ThrowIfFailed(_commandList->Reset(_deviceResources.GetCommandAllocator(), _pipelineState));
+
+            {
+                _commandList->SetGraphicsRootSignature(_rootSignature);
+                const uint ppHeapsCount = 1;
+                ID3D12DescriptorHeap** ppHeaps = stackalloc ID3D12DescriptorHeap*[(int)ppHeapsCount]
+                {
+                    _cbvHeap
+                };
+
+                _commandList->SetDescriptorHeaps(ppHeapsCount, ppHeaps);
+
+                D3D12_GPU_DESCRIPTOR_HANDLE gpuHandleBase;
+                _cbvHeap->GetGPUDescriptorHandleForHeapStart(&gpuHandleBase);
+                D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE.Create(gpuHandleBase,
+                    (int)_deviceResources.GetCurrentFrameIndex(),
+                    _cbvDescriptorSize);
+                _commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
+
+                D3D12_VIEWPORT viewport = _deviceResources.GetScreenViewport();
+                _commandList->RSSetViewports(1, &viewport);
+                D3D12_RECT rect = _scissorRect;
+                _commandList->RSSetScissorRects(1, &rect);
+
+                D3D12_RESOURCE_BARRIER renderTargetResourceBarrier =
+                    CD3DX12_RESOURCE_BARRIER.Transition(
+                        _deviceResources.GetRenderTarget(),
+                        D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_PRESENT,
+                        D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_RENDER_TARGET
+                    );
+                _commandList->ResourceBarrier(1, &renderTargetResourceBarrier);
+
+                float* cornflowerBlue = stackalloc float[] { 0.392156899f, 0.584313750f, 0.929411829f, 1.000000000f };
+                D3D12_CPU_DESCRIPTOR_HANDLE renderTargetView = _deviceResources.GetRenderTargetView();
+                D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = _deviceResources.GetDepthStencilView();
+                _commandList->ClearRenderTargetView(renderTargetView, cornflowerBlue, 0, null);
+                _commandList->ClearDepthStencilView(depthStencilView,
+                    D3D12_CLEAR_FLAGS.D3D12_CLEAR_FLAG_DEPTH,
+                    1, 0, 0,
+                    null);
+
+                _commandList->OMSetRenderTargets(1, &renderTargetView, FALSE, &depthStencilView);
+
+                _commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY.D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+                fixed (D3D12_VERTEX_BUFFER_VIEW* pVertex = &_vertexBufferView)
+                fixed (D3D12_INDEX_BUFFER_VIEW* pIndex = &_indexBufferView)
+                {
+                    _commandList->IASetVertexBuffers(0, 1, pVertex);
+                    _commandList->IASetIndexBuffer(pIndex);
+                }
+
+                _commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
+
+                D3D12_RESOURCE_BARRIER presentResourceBarrier =
+                    CD3DX12_RESOURCE_BARRIER.Transition(
+                        _deviceResources.GetRenderTarget(),
+                        D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_RENDER_TARGET,
+                        D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_PRESENT);
+                _commandList->ResourceBarrier(1, &presentResourceBarrier);
+            }
+
+            ThrowIfFailed(_commandList->Close());
+
+            const uint ppCommandListsCount = 1;
+            ID3D12CommandList** ppCommandLists = stackalloc ID3D12CommandList*[(int)ppCommandListsCount]
+            {
+                (ID3D12CommandList*)_commandList
+            };
+
+            _deviceResources.GetCommandQueue()->ExecuteCommandLists(ppCommandListsCount, ppCommandLists);
+
+            return true;
         }
 
         public void SaveState()
         {
+            IPropertySet state = ApplicationData.Current.LocalSettings.Values;
+
+            if (state.ContainsKey(AngleKey))
+            {
+                state.Remove(AngleKey);
+            }
+            if (state.ContainsKey(TrackingKey))
+            {
+                state.Remove(TrackingKey);
+            }
+
+            state.Add(AngleKey, PropertyValue.CreateSingle(_rotationY));
+            state.Add(TrackingKey, PropertyValue.CreateBoolean(_tracking));
         }
 
         public void StartTracking()
         {
+            _tracking = true;
         }
 
         public void TrackingUpdate(float positionX)
         {
+            if (_tracking)
+            {
+                float radians = (float)(Math.PI * 2 * positionX / _deviceResources.GetOutputSize().Width);
+                Rotate(radians);
+            }
         }
 
         public void StopTracking()
         {
+            _tracking = false;
         }
 
         public bool IsTracking() => _tracking;
@@ -188,9 +343,9 @@ namespace UWPPlayground.Content
         private ModelViewProjectionConstantBuffer _constantBufferData;
         private unsafe byte* _mappedConstantBuffer;
         private uint _cbvDescriptorSize;
-        private RECT _scissorRect;
-        private UnmanagedSpan<byte> _vertexShader;
-        private UnmanagedSpan<byte> _pixelShader;
+        private D3D12_RECT _scissorRect;
+        private unsafe ID3DBlob* _vertexShader;
+        private unsafe ID3DBlob* _pixelShader;
         private D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
         private D3D12_INDEX_BUFFER_VIEW _indexBufferView;
 

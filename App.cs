@@ -21,6 +21,10 @@ namespace UWPPlayground
     /// </summary>
     internal sealed unsafe class App : IFrameworkView
     {
+        public App()
+        {
+
+        }
         private static class ReturnCodes
         {
             public const int Success = 0;
@@ -35,13 +39,14 @@ namespace UWPPlayground
         private UWPDirectXMain _main;
         private bool _windowClosed = false;
         private bool _windowVisible = true;
-        private DeviceResources _deviceResources = new DeviceResources();
+        private DeviceResources _deviceResources;
 
         public void Initialize(CoreApplicationView applicationView)
         {
             applicationView.Activated += OnActivated;
             CoreApplication.Suspending += OnSuspending;
             CoreApplication.Resuming += OnResuming;
+            
         }
 
         public void SetWindow(CoreWindow window)
@@ -71,7 +76,7 @@ namespace UWPPlayground
                 {
                     CoreWindow.GetForCurrentThread().Dispatcher.ProcessEvents(CoreProcessEventsOption.ProcessAllIfPresent);
 
-                    var commandQueue = GetDeviceResources().GetCommandQueue();
+                    ID3D12CommandQueue* commandQueue = GetDeviceResources().GetCommandQueue();
                      
                     _main.Update();
 
@@ -89,7 +94,6 @@ namespace UWPPlayground
 
         public void Uninitialize()
         {
-            throw new NotImplementedException();
         }
 
         private void OnSuspending(object sender, SuspendingEventArgs e)

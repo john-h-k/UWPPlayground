@@ -30,7 +30,7 @@ namespace UWPPlayground.Common
         public const float HeightThreshold = 1080.0f;	// 1080p height.
     };
 
-// Constants used to calculate screen rotations.
+    // Constants used to calculate screen rotations.
     public static class ScreenRotation
     {
         // 0-degree Z-rotation
@@ -95,7 +95,7 @@ namespace UWPPlayground.Common
         private IntPtr _fenceEvent;
 
         // Cached reference to the Window.
-        private CoreWindow _window;
+        private CoreWindow  _window;
 
         // Cached device properties.
         private Size _d3dRenderTargetSize;
@@ -379,10 +379,11 @@ namespace UWPPlayground.Common
                 swapChainDesc.AlphaMode = DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_IGNORE;
 
                 IDXGISwapChain1* swapChain;
+                IntPtr pWindow = Marshal.GetIUnknownForObject(_window);
                 DirectXHelper.ThrowIfFailed(
                     _dxgiFactory->CreateSwapChainForCoreWindow(
                         (IUnknown*)_commandQueue,
-                        (IUnknown*)(void*)Unsafe.As<CoreWindow, IntPtr>(ref _window),
+                        (IUnknown*)pWindow,
                         &swapChainDesc,
                         null,
                         &swapChain));
@@ -390,7 +391,7 @@ namespace UWPPlayground.Common
                 fixed (IDXGISwapChain3** p = &_swapChain)
                 {
                     Guid iid = DXGI.IID_IDXGISwapChain3;
-                    DirectXHelper.ThrowIfFailed(_swapChain->QueryInterface(&iid, (void**)p));
+                    DirectXHelper.ThrowIfFailed(swapChain->QueryInterface(&iid, (void**)p));
                 }
             }
 
@@ -445,7 +446,7 @@ namespace UWPPlayground.Common
             }
 
             {
-                D3D12_HEAP_PROPERTIES depthHeapProperties =  CD3DX12_HEAP_PROPERTIES.Create(D3D12_HEAP_TYPE.D3D12_HEAP_TYPE_DEFAULT);
+                D3D12_HEAP_PROPERTIES depthHeapProperties = CD3DX12_HEAP_PROPERTIES.Create(D3D12_HEAP_TYPE.D3D12_HEAP_TYPE_DEFAULT);
 
                 D3D12_RESOURCE_DESC depthResourceDesc =
                     CD3DX12_RESOURCE_DESC.Tex2D(_depthBufferFormat, backBufferWidth, backBufferHeight, 1, 1);

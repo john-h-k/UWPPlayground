@@ -254,9 +254,10 @@ namespace UWPPlayground.Common
             where T : unmanaged
         {
             if (source.Length > dest.Length)
-                ThrowHelper.ThrowArgOutOfRange();
+                ThrowHelper.ThrowArgOutOfRange($"Source Length of {source.Length} " +
+                                               $"greater than dest length of {dest.Length}");
             fixed (T* sourcePtr = source)
-            fixed (T* destPtr = &dest.GetPinnableReference())
+            fixed (T* destPtr = dest)
             {
                 Unsafe.CopyBlockUnaligned(destPtr, sourcePtr, (uint)source.Length);
             }
