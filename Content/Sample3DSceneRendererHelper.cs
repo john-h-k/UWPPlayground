@@ -51,7 +51,7 @@ namespace UWPPlayground.Content
         {
             const string fileName = "SampleVertexShader.cso";
 
-            nuint size = (nuint)new FileInfo(fileName).Length;
+            UIntPtr size = (UIntPtr)new FileInfo(fileName).Length;
             Span<byte> span = CreateBlob(out _vertexShader, size);
             byte[] shader = File.ReadAllBytes(fileName);
             shader.CopyTo(span);
@@ -61,13 +61,13 @@ namespace UWPPlayground.Content
         {
             const string fileName = "SamplePixelShader.cso";
 
-            nuint size = (nuint)new FileInfo(fileName).Length;
+            UIntPtr size = (UIntPtr)new FileInfo(fileName).Length;
             Span<byte> span = CreateBlob(out _pixelShader, size);
             byte[] shader = File.ReadAllBytes(fileName);
             shader.CopyTo(span);
         }
 
-        private static unsafe Span<byte> CreateBlob(out ID3DBlob* ppBlob, nuint size)
+        private static unsafe Span<byte> CreateBlob(out ID3DBlob* ppBlob, UIntPtr size)
         {
 #if DEBUG
             ppBlob = null;
@@ -251,7 +251,7 @@ namespace UWPPlayground.Content
             {
                 D3D12_SUBRESOURCE_DATA vertexData;
                 vertexData.pData = (byte*)cubeVertices;
-                vertexData.RowPitch = (nint)vertexBufferSize;
+                vertexData.RowPitch = (IntPtr)vertexBufferSize;
                 vertexData.SlicePitch = vertexData.RowPitch;
 
                 Functions.UpdateSubresources(
@@ -350,7 +350,7 @@ namespace UWPPlayground.Content
             {
                 D3D12_SUBRESOURCE_DATA indexData;
                 indexData.pData = (byte*)cubeIndices;
-                indexData.RowPitch = (nint)indexBufferSize;
+                indexData.RowPitch = (IntPtr)indexBufferSize;
                 indexData.SlicePitch = indexData.RowPitch;
 
                 Functions.UpdateSubresources(
@@ -417,7 +417,7 @@ namespace UWPPlayground.Content
                 cbvCpuHandle.Offset((int)_cbvDescriptorSize);
             }
 
-            D3D12_RANGE readRange = CD3DX12_RANGE.Create(0, 0);
+            D3D12_RANGE readRange = CD3DX12_RANGE.Create((UIntPtr)0, (UIntPtr)0);
 
             fixed (byte** p = &_mappedConstantBuffer)
             {
