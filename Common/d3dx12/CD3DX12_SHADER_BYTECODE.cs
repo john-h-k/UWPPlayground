@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using TerraFX.Interop;
 
@@ -30,7 +31,7 @@ namespace UWPPlayground.Common.d3dx12
         }
         public static D3D12_SHADER_BYTECODE Create(
             void* _pShaderBytecode,
-            nuint bytecodeLength)
+            UIntPtr bytecodeLength)
         {
 
             var obj = new D3D12_SHADER_BYTECODE
