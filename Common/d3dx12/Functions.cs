@@ -16,7 +16,7 @@ namespace UWPPlayground.Common.d3dx12
         )
         {
             D3D12_FEATURE_DATA_FORMAT_INFO formatInfo = new D3D12_FEATURE_DATA_FORMAT_INFO {Format = Format};
-            if (TerraFX.Interop.Windows.FAILED(pDevice->CheckFeatureSupport(D3D12_FEATURE.D3D12_FEATURE_FORMAT_INFO,
+            if (FAILED(pDevice->CheckFeatureSupport(D3D12_FEATURE.D3D12_FEATURE_FORMAT_INFO,
                 &formatInfo, (uint) sizeof(D3D12_FEATURE_DATA_FORMAT_INFO))))
             {
                 return 0;
@@ -43,7 +43,8 @@ namespace UWPPlayground.Common.d3dx12
             ulong RequiredSize = 0;
             ulong MemToAlloc = (ulong) (sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) + sizeof(uint) + sizeof(ulong)) *
                                NumSubresources;
-            if (MemToAlloc > 0xffffffffffffffff) // TODO why is this like this (from d3dx12.h)
+
+            if (MemToAlloc > (ulong)(void*)-1) // new
             {
                 return 0;
             }
@@ -124,7 +125,7 @@ namespace UWPPlayground.Common.d3dx12
 
             if (IntermediateDesc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER ||
                 IntermediateDesc.Width < RequiredSize + pLayouts[0].Offset ||
-                RequiredSize > (nuint) (-1) ||
+                RequiredSize > (ulong)(void*)(-1) ||
                 (DestinationDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER &&
                  (FirstSubresource != 0 || NumSubresources != 1)))
             {
@@ -145,15 +146,15 @@ namespace UWPPlayground.Common.d3dx12
                    SIZE_T RowPitch;
                    SIZE_T SlicePitch;
                  */
-                if (pRowSizesInBytes[i] > ((nuint) (-1))) return 0;
+                if (pRowSizesInBytes[i] > (ulong)(void*)-1) return 0;
                 D3D12_MEMCPY_DEST DestData = new D3D12_MEMCPY_DEST
                 {
                     pData = pData + pLayouts[i].Offset,
-                    RowPitch = pLayouts[i].Footprint.RowPitch,
-                    SlicePitch = pLayouts[i].Footprint.RowPitch * pNumRows[i]
+                    RowPitch = (UIntPtr)pLayouts[i].Footprint.RowPitch,
+                    SlicePitch = (UIntPtr)(pLayouts[i].Footprint.RowPitch * pNumRows[i])
                 };
 
-                MemcpySubresource(&DestData, &pSrcData[i], (nuint) pRowSizesInBytes[i], pNumRows[i],
+                MemcpySubresource(&DestData, &pSrcData[i], (UIntPtr) pRowSizesInBytes[i], pNumRows[i],
                     pLayouts[i].Footprint.Depth);
             }
 
@@ -183,19 +184,19 @@ namespace UWPPlayground.Common.d3dx12
         public static void MemcpySubresource(
             [In] D3D12_MEMCPY_DEST* pDest,
             [In] D3D12_SUBRESOURCE_DATA* pSrc,
-            nuint RowSizeInBytes,
+            UIntPtr RowSizeInBytes,
             uint NumRows,
             uint NumSlices)
         {
             for (uint z = 0; z < NumSlices; ++z)
             {
-                byte* pDestSlice = (byte*) (pDest->pData) + pDest->SlicePitch * z;
-                byte* pSrcSlice = (byte*) (pSrc->pData) + pSrc->SlicePitch * z;
+                byte* pDestSlice = (byte*) (pDest->pData) + (ulong)(UIntPtr)((ulong)pDest->SlicePitch * z);
+                byte* pSrcSlice = (byte*) (pSrc->pData) + (ulong)(UIntPtr)((ulong)pSrc->SlicePitch * z);
                 for (uint y = 0; y < NumRows; ++y)
                 {
-                    Buffer.MemoryCopy(pDestSlice + pDest->RowPitch * y,
-                        pSrcSlice + pSrc->RowPitch * y,
-                        RowSizeInBytes, RowSizeInBytes);
+                    Buffer.MemoryCopy(pDestSlice + (ulong)(UIntPtr)((ulong)pDest->RowPitch * y),
+                        pSrcSlice + (ulong)pSrc->RowPitch * y,
+                        (ulong)RowSizeInBytes, (ulong)RowSizeInBytes);
                 }
             }
         }

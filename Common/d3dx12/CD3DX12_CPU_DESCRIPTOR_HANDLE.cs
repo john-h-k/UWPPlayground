@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using TerraFX.Interop;
 
@@ -14,21 +15,22 @@ namespace UWPPlayground.Common.d3dx12
 
         public static D3D12_CPU_DESCRIPTOR_HANDLE Create(in D3D12_CPU_DESCRIPTOR_HANDLE other, int offsetScaledByIncrementSize)
         {
-            return new D3D12_CPU_DESCRIPTOR_HANDLE { ptr = other.ptr + (nuint)offsetScaledByIncrementSize };
+            return new D3D12_CPU_DESCRIPTOR_HANDLE { ptr = (UIntPtr)((ulong)other.ptr + (ulong)offsetScaledByIncrementSize) };
         }
 
         public static D3D12_CPU_DESCRIPTOR_HANDLE Create(in D3D12_CPU_DESCRIPTOR_HANDLE other, int offsetInDescriptors, uint descriptorIncrementSize)
         {
-            return new D3D12_CPU_DESCRIPTOR_HANDLE { ptr = other.ptr + (nuint)((ulong)(offsetInDescriptors) * descriptorIncrementSize) };
+            return new D3D12_CPU_DESCRIPTOR_HANDLE { ptr = (UIntPtr)((ulong)other.ptr + (ulong)offsetInDescriptors * descriptorIncrementSize) };
         }
 
         public static void Offset(this D3D12_CPU_DESCRIPTOR_HANDLE obj, int offsetInDescriptors, uint descriptorIncrementSize)
         {
-            obj.ptr += (nuint)((ulong)offsetInDescriptors * descriptorIncrementSize);
+            obj.ptr = (UIntPtr)((ulong)obj.ptr + (ulong)offsetInDescriptors * descriptorIncrementSize);
         }
+
         public static void Offset(this D3D12_CPU_DESCRIPTOR_HANDLE obj, int offsetScaledByIncrementSize)
         {
-            obj.ptr += (nuint)offsetScaledByIncrementSize;
+            obj.ptr = (UIntPtr)((ulong)obj.ptr + (ulong)offsetScaledByIncrementSize);
         }
 
         public static D3D12_CPU_DESCRIPTOR_HANDLE InitOffsetted(in D3D12_CPU_DESCRIPTOR_HANDLE @base, int offsetScaledByIncrementSize)
@@ -45,12 +47,12 @@ namespace UWPPlayground.Common.d3dx12
 
         public static void InitOffsetted(out D3D12_CPU_DESCRIPTOR_HANDLE handle, in D3D12_CPU_DESCRIPTOR_HANDLE @base, int offsetScaledByIncrementSize)
         {
-            handle.ptr = @base.ptr + (nuint)offsetScaledByIncrementSize;
+            handle.ptr = (UIntPtr)((ulong)@base.ptr + (ulong)offsetScaledByIncrementSize);
         }
 
         public static void InitOffsetted(out D3D12_CPU_DESCRIPTOR_HANDLE handle, in D3D12_CPU_DESCRIPTOR_HANDLE @base, int offsetInDescriptors, uint descriptorIncrementSize)
         {
-            handle.ptr = @base.ptr + (nuint)((ulong)(offsetInDescriptors) * descriptorIncrementSize);
+            handle.ptr =(UIntPtr)((ulong)@base.ptr + (ulong)offsetInDescriptors * descriptorIncrementSize);
         }
     }
 }
