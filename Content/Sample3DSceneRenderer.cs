@@ -1,29 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
 using TerraFX.Interop;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Storage;
 using UWPPlayground.Common;
 using UWPPlayground.Common.d3dx12;
 using static UWPPlayground.Common.DirectXHelper;
-using static TerraFX.Interop.D3DCommon;
 using static TerraFX.Interop.D3D12;
+using static UWPPlayground.Common.ComPtrExtensions;
 using static TerraFX.Interop.Windows;
 using static TerraFX.Interop.D3D12_ROOT_SIGNATURE_FLAGS;
-using UWPPlayground.Common;
-using UWPPlayground.Common.d3dx12;
-using static TerraFX.Interop.DXGI_FORMAT;
-using static TerraFX.Interop.D3D12_INPUT_CLASSIFICATION;
-using static UWPPlayground.Common.d3dx12.CD3DX12_DEFAULT;
-using static UWPPlayground.Common.DirectXHelper;
-using static TerraFX.Interop.D3D12;
 using Size = Windows.Foundation.Size;
 using D3D12_RECT = TerraFX.Interop.RECT;
 
@@ -31,10 +19,6 @@ namespace UWPPlayground.Content
 {
     public partial class Sample3DSceneRenderer : IDisposable
     {
-        private static partial class Sample3DSceneRendererHelper
-        {
-        }
-
         private static readonly string AngleKey = "Angle";
         private static readonly string TrackingKey = "Tracking";
         private bool _disposed;
@@ -116,6 +100,9 @@ namespace UWPPlayground.Content
 
                     NameObject(_rootSignature, nameof(_rootSignature));
                 }
+
+                Release(pSignature);
+                Release(pError);
             }
 
 
@@ -204,9 +191,9 @@ namespace UWPPlayground.Content
 
                 _commandList->SetDescriptorHeaps(ppHeapsCount, ppHeaps);
 
-                D3D12_GPU_DESCRIPTOR_HANDLE gpuHandleBase;
-                _cbvHeap->GetGPUDescriptorHandleForHeapStart(&gpuHandleBase);
-                D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE.Create(gpuHandleBase,
+                D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
+                _cbvHeap->GetGPUDescriptorHandleForHeapStart(&gpuHandle);
+                gpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE.Create(gpuHandle,
                     (int)_deviceResources.GetCurrentFrameIndex(),
                     _cbvDescriptorSize);
                 _commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
@@ -313,13 +300,13 @@ namespace UWPPlayground.Content
 
             if (state.ContainsKey(AngleKey))
             {
-                _rotationY = ((IPropertyValue)state[AngleKey]).GetSingle();
+                //_rotationY = ((IPropertyValue)state[AngleKey]).GetSingle();
             }
 
             if (state.ContainsKey(TrackingKey))
             {
-                _tracking = ((IPropertyValue)state[TrackingKey]).GetBoolean();
-                state.Remove(TrackingKey);
+                //_tracking = ((IPropertyValue)state[TrackingKey]).GetBoolean();
+                //state.Remove(TrackingKey);
             }
         }
 

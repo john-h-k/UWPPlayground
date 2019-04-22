@@ -119,6 +119,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="App.cs" />
+    <Compile Include="Common\ComPtr.cs" />
     <Compile Include="Common\d3dx12\CD3DX12_BLEND_DESC.cs" />
     <Compile Include="Common\d3dx12\CD3DX12_BOX.cs" />
     <Compile Include="Common\d3dx12\CD3DX12_CLEAR_VALUE.cs" />

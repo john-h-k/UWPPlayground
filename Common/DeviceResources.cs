@@ -1,15 +1,16 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Windows.ApplicationModel.Appointments.DataProvider;
 using Windows.Foundation;
-using Windows.Foundation.Metadata;
 using Windows.Graphics.Display;
 using Windows.UI.Core;
 using TerraFX.Interop;
 using UWPPlayground.Common.d3dx12;
+using static TerraFX.Interop.Windows;
+using static UWPPlayground.Common.ComPtrExtensions;
+
+using HRESULT = System.Int32;
 
 namespace UWPPlayground.Common
 {
@@ -168,14 +169,18 @@ namespace UWPPlayground.Common
         private void CreateDeviceResources()
         {
 #if DEBUG
-            ID3D12Debug* debugController;
-
-            Guid iid = D3D12.IID_ID3D12Debug;
-            if (TerraFX.Interop.Windows.SUCCEEDED(D3D12.D3D12GetDebugInterface(&iid, (void**)&debugController)))
+            Guid iid;
             {
-                debugController->EnableDebugLayer();
+                ID3D12Debug* debugController;
+
+                iid = D3D12.IID_ID3D12Debug;
+                if (SUCCEEDED(D3D12.D3D12GetDebugInterface(&iid, (void**)&debugController)))
+                {
+                    debugController->EnableDebugLayer();
+                }
+
+                Release(debugController);
             }
-            // TODO enable debugging via SDK layers
 #endif
             iid = DXGI.IID_IDXGIFactory4;
             fixed (IDXGIFactory4** p = &_dxgiFactory)
@@ -199,17 +204,22 @@ namespace UWPPlayground.Common
                 );
 
 #if DEBUG
-                IDXGIAdapter* warpAdapter;
-                iid = DXGI.IID_IDXGIAdapter;
-                DirectXHelper.ThrowIfFailed(_dxgiFactory->EnumWarpAdapter(&iid, (void**)&warpAdapter));
+                if (FAILED(hr))
+                {
+                    IDXGIAdapter* warpAdapter;
+                    iid = DXGI.IID_IDXGIAdapter;
+                    DirectXHelper.ThrowIfFailed(_dxgiFactory->EnumWarpAdapter(&iid, (void**)&warpAdapter));
 
-                iid = D3D12.IID_ID3D12Device1;
-                hr = D3D12.D3D12CreateDevice(
-                    (IUnknown*)warpAdapter,
-                    D3D_FEATURE_LEVEL.D3D_FEATURE_LEVEL_11_0,
-                    &iid,
-                    (void**)p
-                );
+                    iid = D3D12.IID_ID3D12Device1;
+                    hr = D3D12.D3D12CreateDevice(
+                        (IUnknown*)warpAdapter,
+                        D3D_FEATURE_LEVEL.D3D_FEATURE_LEVEL_11_0,
+                        &iid,
+                        (void**)p
+                    );
+
+                    Release(warpAdapter);
+                }
 #endif
             }
 
@@ -284,6 +294,8 @@ namespace UWPPlayground.Common
             {
                 DirectXHelper.ThrowIfFailed(Marshal.GetLastWin32Error());
             }
+
+            Release(adapter);
         }
 
         private void GetHardwareAdapater(IDXGIAdapter1** ppAdapter)
@@ -292,7 +304,7 @@ namespace UWPPlayground.Common
             *ppAdapter = null;
 
             for (uint adapterIndex = 0;
-                TerraFX.Interop.Windows.DXGI_ERROR_NOT_FOUND != _dxgiFactory->EnumAdapters1(adapterIndex, &adapter);
+                DXGI_ERROR_NOT_FOUND != _dxgiFactory->EnumAdapters1(adapterIndex, &adapter);
                 adapterIndex++)
             {
                 DXGI_ADAPTER_DESC1 desc;
@@ -304,7 +316,7 @@ namespace UWPPlayground.Common
                 }
 
                 Guid iid = D3D12.IID_ID3D12Device;
-                if (TerraFX.Interop.Windows.SUCCEEDED(D3D12.D3D12CreateDevice((IUnknown*)adapter, D3D_FEATURE_LEVEL.D3D_FEATURE_LEVEL_11_0, &iid, null)))
+                if (SUCCEEDED(D3D12.D3D12CreateDevice((IUnknown*)adapter, D3D_FEATURE_LEVEL.D3D_FEATURE_LEVEL_11_0, &iid, null)))
                 {
                     break;
                 }
@@ -393,6 +405,8 @@ namespace UWPPlayground.Common
                     Guid iid = DXGI.IID_IDXGISwapChain3;
                     DirectXHelper.ThrowIfFailed(swapChain->QueryInterface(&iid, (void**)p));
                 }
+
+                Release(swapChain);
             }
 
             switch (displayRotation)
@@ -618,6 +632,7 @@ namespace UWPPlayground.Common
                 IDXGIAdapter1* previousDefaultAdapter;
                 DirectXHelper.ThrowIfFailed(_dxgiFactory->EnumAdapters1(0, &previousDefaultAdapter));
                 DirectXHelper.ThrowIfFailed(previousDefaultAdapter->GetDesc(&previousDesc));
+                Release(previousDefaultAdapter);
             }
 
             DXGI_ADAPTER_DESC currentDesc;
@@ -634,16 +649,19 @@ namespace UWPPlayground.Common
 
                 if (previousDesc.AdapterLuid.LowPart != currentDesc.AdapterLuid.LowPart ||
                     previousDesc.AdapterLuid.HighPart != currentDesc.AdapterLuid.HighPart ||
-                    TerraFX.Interop.Windows.FAILED(_d3dDevice->GetDeviceRemovedReason()))
+                    FAILED(_d3dDevice->GetDeviceRemovedReason()))
                 {
                     _deviceRemoved = true;
                 }
+
+                Release(currrentDxgiFactory);
+                Release(currentDefaultAdapter);
             }
         }
 
         public void Present()
         {
-            Int32 hr = _swapChain->Present(1, 0);
+            HRESULT hr = _swapChain->Present(1, 0);
 
             if (hr == TerraFX.Interop.Windows.DXGI_ERROR_DEVICE_REMOVED || hr == TerraFX.Interop.Windows.DXGI_ERROR_DEVICE_RESET)
             {
@@ -699,10 +717,10 @@ namespace UWPPlayground.Common
         // D3D Accessors.
         public ID3D12Device* GetD3DDevice() => _d3dDevice;
         public IDXGISwapChain3* GetSwapChain() => _swapChain;
-        public ID3D12Resource* GetRenderTarget() => _renderTargets[unchecked((int)_currentFrame)];
+        public ID3D12Resource* GetRenderTarget() => _renderTargets[_currentFrame];
         public ID3D12Resource* GetDepthStencil() => _depthStencil;
         public ID3D12CommandQueue* GetCommandQueue() => _commandQueue;
-        public ID3D12CommandAllocator* GetCommandAllocator() => _commandAllocators[unchecked((int)_currentFrame)];
+        public ID3D12CommandAllocator* GetCommandAllocator() => _commandAllocators[_currentFrame];
         public DXGI_FORMAT GetBackBufferFormat() => _backBufferFormat;
         public DXGI_FORMAT GetDepthBufferFormat() => _depthBufferFormat;
         public D3D12_VIEWPORT GetScreenViewport() => _screenViewport;
