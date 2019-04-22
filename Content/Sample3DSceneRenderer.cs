@@ -17,7 +17,7 @@ using D3D12_RECT = TerraFX.Interop.RECT;
 
 namespace UWPPlayground.Content
 {
-    public partial class Sample3DSceneRenderer : IDisposable
+    public sealed partial class Sample3DSceneRenderer : IDisposable
     {
         private static readonly string AngleKey = "Angle";
         private static readonly string TrackingKey = "Tracking";
@@ -32,30 +32,6 @@ namespace UWPPlayground.Content
 
             CreateDeviceDependentResources();
             CreateWindowSizeDependentResources();
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-            _disposed = true;
-        }
-
-        protected virtual unsafe void Dispose(bool disposing)
-        {
-            if (_disposed) return;
-            if (disposing)
-            {
-                // Managed disposal (COM Ptr in future? TODO?)
-            }
-
-            _constantBuffer->Unmap(0, null);
-            _mappedConstantBuffer = null;
-        }
-
-        ~Sample3DSceneRenderer()
-        {
-            Dispose(false);
         }
 
         public unsafe void CreateDeviceDependentResources()
@@ -182,26 +158,26 @@ namespace UWPPlayground.Content
             ThrowIfFailed(_commandList->Reset(_deviceResources.GetCommandAllocator(), _pipelineState));
 
             {
-                _commandList->SetGraphicsRootSignature(_rootSignature);
+                //_commandList->SetGraphicsRootSignature(_rootSignature);
                 const uint ppHeapsCount = 1;
                 ID3D12DescriptorHeap** ppHeaps = stackalloc ID3D12DescriptorHeap*[(int)ppHeapsCount]
                 {
                     _cbvHeap
                 };
 
-                _commandList->SetDescriptorHeaps(ppHeapsCount, ppHeaps);
+                //_commandList->SetDescriptorHeaps(ppHeapsCount, ppHeaps);
 
                 D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
                 _cbvHeap->GetGPUDescriptorHandleForHeapStart(&gpuHandle);
                 gpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE.Create(gpuHandle,
                     (int)_deviceResources.GetCurrentFrameIndex(),
                     _cbvDescriptorSize);
-                _commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
+                //_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
 
                 D3D12_VIEWPORT viewport = _deviceResources.GetScreenViewport();
-                _commandList->RSSetViewports(1, &viewport);
+                //_commandList->RSSetViewports(1, &viewport);
                 D3D12_RECT rect = _scissorRect;
-                _commandList->RSSetScissorRects(1, &rect);
+                //_commandList->RSSetScissorRects(1, &rect);
 
                 D3D12_RESOURCE_BARRIER renderTargetResourceBarrier =
                     CD3DX12_RESOURCE_BARRIER.Transition(
@@ -209,36 +185,35 @@ namespace UWPPlayground.Content
                         D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_PRESENT,
                         D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_RENDER_TARGET
                     );
-                _commandList->ResourceBarrier(1, &renderTargetResourceBarrier);
+                //_commandList->ResourceBarrier(1, &renderTargetResourceBarrier);
 
-                float* cornflowerBlue = stackalloc float[] { 0.392156899f, 0.584313750f, 0.929411829f, 1.000000000f };
                 D3D12_CPU_DESCRIPTOR_HANDLE renderTargetView = _deviceResources.GetRenderTargetView();
                 D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = _deviceResources.GetDepthStencilView();
-                _commandList->ClearRenderTargetView(renderTargetView, cornflowerBlue, 0, null);
-                _commandList->ClearDepthStencilView(depthStencilView,
-                    D3D12_CLEAR_FLAGS.D3D12_CLEAR_FLAG_DEPTH,
-                    1, 0, 0,
-                    null);
+                //_commandList->ClearRenderTargetView(renderTargetView, CornflowerBlue, 0, null);
+                //_commandList->ClearDepthStencilView(depthStencilView,
+                //D3D12_CLEAR_FLAGS.D3D12_CLEAR_FLAG_DEPTH,
+                //1, 0, 0,
+                //null);
 
-                _commandList->OMSetRenderTargets(1, &renderTargetView, FALSE, &depthStencilView);
+                // _commandList->OMSetRenderTargets(1, &renderTargetView, FALSE, &depthStencilView);
 
-                _commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY.D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+                //_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY.D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
                 fixed (D3D12_VERTEX_BUFFER_VIEW* pVertex = &_vertexBufferView)
                 fixed (D3D12_INDEX_BUFFER_VIEW* pIndex = &_indexBufferView)
                 {
-                    _commandList->IASetVertexBuffers(0, 1, pVertex);
-                    _commandList->IASetIndexBuffer(pIndex);
+                    //_commandList->IASetVertexBuffers(0, 1, pVertex);
+                    //_commandList->IASetIndexBuffer(pIndex);
                 }
 
-                _commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
+                //_commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
 
                 D3D12_RESOURCE_BARRIER presentResourceBarrier =
                     CD3DX12_RESOURCE_BARRIER.Transition(
                         _deviceResources.GetRenderTarget(),
                         D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_RENDER_TARGET,
                         D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_PRESENT);
-                _commandList->ResourceBarrier(1, &presentResourceBarrier);
+                //_commandList->ResourceBarrier(1, &presentResourceBarrier);
             }
 
             ThrowIfFailed(_commandList->Close());
@@ -337,9 +312,44 @@ namespace UWPPlayground.Content
         private D3D12_INDEX_BUFFER_VIEW _indexBufferView;
 
         private bool _loadingComplete;
-        private float _radiansPerSecond;
+        private readonly float _radiansPerSecond;
         private bool _tracking;
         private bool _rotating;
         private float _rotationY;
+
+        private unsafe void ReleaseUnmanagedResources()
+        {
+            _commandList->Release();
+            _rootSignature->Release();
+            _pipelineState->Release();
+            _cbvHeap->Release();
+            _vertexBuffer->Release();
+            _indexBuffer->Release();
+            _constantBuffer->Release();
+            _vertexShader->Release();
+            _pixelShader->Release();
+            _constantBuffer->Unmap(0, null);
+            _mappedConstantBuffer = null;
+        }
+
+        private void Dispose(bool disposing)
+        {
+            ReleaseUnmanagedResources();
+            if (disposing)
+            {
+                _deviceResources?.Dispose();
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        ~Sample3DSceneRenderer()
+        {
+            Dispose(false);
+        }
     }
 }

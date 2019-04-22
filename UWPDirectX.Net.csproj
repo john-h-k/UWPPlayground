@@ -100,7 +100,8 @@
     <ErrorReport>prompt</ErrorReport>
     <Prefer32Bit>true</Prefer32Bit>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <WarningLevel>0</WarningLevel>
+    <WarningLevel>1</WarningLevel>
+    <LangVersion>default</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutputPath>bin\x64\Release\</OutputPath>
@@ -119,6 +120,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="App.cs" />
+    <Compile Include="Common\ComDisposer.cs" />
     <Compile Include="Common\ComPtr.cs" />
     <Compile Include="Common\d3dx12\CD3DX12_BLEND_DESC.cs" />
     <Compile Include="Common\d3dx12\CD3DX12_BOX.cs" />
@@ -143,6 +145,7 @@
     <Compile Include="Common\d3dx12\Functions.cs" />
     <Compile Include="Common\DeviceResources.cs" />
     <Compile Include="Common\DirectXHelper.cs" />
+    <Compile Include="Common\Errors.cs" />
     <Compile Include="Common\StepTimer.cs" />
     <Compile Include="Common\ThrowHelper.cs" />
     <Compile Include="Content\Sample3DSceneRenderer.cs" />

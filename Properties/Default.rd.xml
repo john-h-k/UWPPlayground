@@ -8,8 +8,8 @@
     To fully enable reflection for App1.MyClass and all of its public/private members
     <Type Name="App1.MyClass" Dynamic="Required All"/>
 
-    To enable dynamic creation of the specific instantiation of AppClass<T> over System.Int32
-    <TypeInstantiation Name="App1.AppClass" Arguments="System.Int32" Activate="Required Public" />
+    To enable dynamic creation of the specific instantiation of AppClass<T> over System.HRESULT
+    <TypeInstantiation Name="App1.AppClass" Arguments="System.HRESULT" Activate="Required Public" />
 
     Using the Namespace directive to apply reflection policy to all the types in a particular namespace
     <Namespace Name="DataClasses.ViewModels" Serialize="All" />
