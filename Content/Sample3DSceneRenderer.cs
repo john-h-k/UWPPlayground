@@ -158,26 +158,26 @@ namespace UWPPlayground.Content
             ThrowIfFailed(_commandList->Reset(_deviceResources.GetCommandAllocator(), _pipelineState));
 
             {
-                //_commandList->SetGraphicsRootSignature(_rootSignature);
+                _commandList->SetGraphicsRootSignature(_rootSignature);
                 const uint ppHeapsCount = 1;
                 ID3D12DescriptorHeap** ppHeaps = stackalloc ID3D12DescriptorHeap*[(int)ppHeapsCount]
                 {
                     _cbvHeap
                 };
 
-                //_commandList->SetDescriptorHeaps(ppHeapsCount, ppHeaps);
+                _commandList->SetDescriptorHeaps(ppHeapsCount, ppHeaps);
 
                 D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
                 _cbvHeap->GetGPUDescriptorHandleForHeapStart(&gpuHandle);
                 gpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE.Create(gpuHandle,
                     (int)_deviceResources.GetCurrentFrameIndex(),
                     _cbvDescriptorSize);
-                //_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
+                _commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
 
                 D3D12_VIEWPORT viewport = _deviceResources.GetScreenViewport();
-                //_commandList->RSSetViewports(1, &viewport);
+                _commandList->RSSetViewports(1, &viewport);
                 D3D12_RECT rect = _scissorRect;
-                //_commandList->RSSetScissorRects(1, &rect);
+               _commandList->RSSetScissorRects(1, &rect);
 
                 D3D12_RESOURCE_BARRIER renderTargetResourceBarrier =
                     CD3DX12_RESOURCE_BARRIER.Transition(
@@ -185,11 +185,11 @@ namespace UWPPlayground.Content
                         D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_PRESENT,
                         D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_RENDER_TARGET
                     );
-                //_commandList->ResourceBarrier(1, &renderTargetResourceBarrier);
+                _commandList->ResourceBarrier(1, &renderTargetResourceBarrier);
 
                 D3D12_CPU_DESCRIPTOR_HANDLE renderTargetView = _deviceResources.GetRenderTargetView();
                 D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = _deviceResources.GetDepthStencilView();
-                //_commandList->ClearRenderTargetView(renderTargetView, CornflowerBlue, 0, null);
+                _commandList->ClearRenderTargetView(renderTargetView, CornflowerBlue, 0, null);
                 //_commandList->ClearDepthStencilView(depthStencilView,
                 //D3D12_CLEAR_FLAGS.D3D12_CLEAR_FLAG_DEPTH,
                 //1, 0, 0,
