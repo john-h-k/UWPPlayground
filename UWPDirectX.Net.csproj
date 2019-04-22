@@ -101,7 +101,7 @@
     <Prefer32Bit>true</Prefer32Bit>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <WarningLevel>1</WarningLevel>
-    <LangVersion>default</LangVersion>
+    <LangVersion>preview</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutputPath>bin\x64\Release\</OutputPath>
@@ -120,8 +120,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="App.cs" />
-    <Compile Include="Common\ComDisposer.cs" />
     <Compile Include="Common\ComPtr.cs" />
+    <Compile Include="Common\ComPtrField.cs" />
     <Compile Include="Common\d3dx12\CD3DX12_BLEND_DESC.cs" />
     <Compile Include="Common\d3dx12\CD3DX12_BOX.cs" />
     <Compile Include="Common\d3dx12\CD3DX12_CLEAR_VALUE.cs" />

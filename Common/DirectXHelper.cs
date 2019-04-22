@@ -34,7 +34,7 @@ namespace UWPPlayground.Common
 
         static unsafe DirectXHelper()
         {
-            CornflowerBlue = (float*)Marshal.AllocHGlobal(sizeof(float) * 4);
+            CornflowerBlue = (float*) Marshal.AllocHGlobal(sizeof(float) * 4);
             CornflowerBlue[0] = 0.392156899f;
             CornflowerBlue[1] = 0.584313750f;
             CornflowerBlue[2] = 0.929411829f;
@@ -55,6 +55,24 @@ namespace UWPPlayground.Common
             var mem = (void*)Marshal.AllocHGlobal(sizeof(char) * name.Length);
             name.AsSpan().CopyTo(new Span<char>(mem, name.Length));
             ((ID3D12Object*)d3Dect)->SetName((char*)mem);
+#endif
+        }
+
+        public static unsafe void NameObject<T>(ComPtr<T> d3Dect, string name) where T : unmanaged
+        {
+#if DEBUG
+            var mem = (void*)Marshal.AllocHGlobal(sizeof(char) * name.Length);
+            name.AsSpan().CopyTo(new Span<char>(mem, name.Length));
+            ((ID3D12Object*)d3Dect.Get())->SetName((char*)mem);
+#endif
+        }
+
+        public static unsafe void NameObject<T>(ComPtrField<T> d3Dect, string name) where T : unmanaged
+        {
+#if DEBUG
+            var mem = (void*)Marshal.AllocHGlobal(sizeof(char) * name.Length);
+            name.AsSpan().CopyTo(new Span<char>(mem, name.Length));
+            ((ID3D12Object*)d3Dect.Get())->SetName((char*)mem);
 #endif
         }
 

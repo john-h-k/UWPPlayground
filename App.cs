@@ -21,14 +21,11 @@ namespace UWPPlayground
     /// </summary>
     internal sealed unsafe class App : IFrameworkView
     {
-        public App()
-        {
-
-        }
         private static class ReturnCodes
         {
             public const int Success = 0;
         }
+
         private static int Main()
         {
             var direct3DApplicationSource = new Direct3DApplicationSource();

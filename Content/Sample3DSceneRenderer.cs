@@ -9,8 +9,6 @@ using UWPPlayground.Common;
 using UWPPlayground.Common.d3dx12;
 using static UWPPlayground.Common.DirectXHelper;
 using static TerraFX.Interop.D3D12;
-using static UWPPlayground.Common.ComPtrExtensions;
-using static TerraFX.Interop.Windows;
 using static TerraFX.Interop.D3D12_ROOT_SIGNATURE_FLAGS;
 using Size = Windows.Foundation.Size;
 using D3D12_RECT = TerraFX.Interop.RECT;
@@ -54,31 +52,28 @@ namespace UWPPlayground.Content
 
                 CD3DX12_ROOT_SIGNATURE_DESC.Init(out D3D12_ROOT_SIGNATURE_DESC descRootSignature, 1, &parameter, 0, null, rootSignatureFlags);
 
-                ID3DBlob* pSignature;
-                ID3DBlob* pError;
+                using ComPtr<ID3DBlob> pSignature = default;
+                using ComPtr<ID3DBlob> pError = default;
 
                 ThrowIfFailed(D3D12SerializeRootSignature(
                     &descRootSignature,
                     D3D_ROOT_SIGNATURE_VERSION.D3D_ROOT_SIGNATURE_VERSION_1,
-                    &pSignature,
-                    &pError));
+                    pSignature.GetAddressOf(),
+                    pError.GetAddressOf()));
 
                 fixed (ID3D12RootSignature** p = &_rootSignature)
                 {
                     Guid iid = IID_ID3D12RootSignature;
                     ThrowIfFailed(d3dDevice->CreateRootSignature(
                         0,
-                        pSignature->GetBufferPointer(),
-                        pSignature->GetBufferSize(),
+                        pSignature.Get()->GetBufferPointer(),
+                        pSignature.Get()->GetBufferSize(),
                         &iid,
                         (void**)p
                     ));
 
                     NameObject(_rootSignature, nameof(_rootSignature));
                 }
-
-                Release(pSignature);
-                Release(pError);
             }
 
 
@@ -189,7 +184,7 @@ namespace UWPPlayground.Content
 
                 D3D12_CPU_DESCRIPTOR_HANDLE renderTargetView = _deviceResources.GetRenderTargetView();
                 D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = _deviceResources.GetDepthStencilView();
-                _commandList->ClearRenderTargetView(renderTargetView, CornflowerBlue, 0, null);
+               // _commandList->ClearRenderTargetView(renderTargetView, CornflowerBlue, 0, null);
                 //_commandList->ClearDepthStencilView(depthStencilView,
                 //D3D12_CLEAR_FLAGS.D3D12_CLEAR_FLAG_DEPTH,
                 //1, 0, 0,

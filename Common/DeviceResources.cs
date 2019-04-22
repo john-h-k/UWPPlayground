@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Windows.Foundation;
 using Windows.Graphics.Display;
@@ -8,7 +9,6 @@ using Windows.UI.Core;
 using TerraFX.Interop;
 using UWPPlayground.Common.d3dx12;
 using static TerraFX.Interop.Windows;
-using static UWPPlayground.Common.ComPtrExtensions;
 
 using HRESULT = System.Int32;
 
@@ -75,14 +75,14 @@ namespace UWPPlayground.Common
 
         private int _currentFrame;
         // Direct3D objects.
-        private ID3D12Device* _d3dDevice;
-        private IDXGIFactory4* _dxgiFactory;
-        private IDXGISwapChain3* _swapChain;
+        private ComPtrField<ID3D12Device> _d3dDevice;
+        private ComPtrField<IDXGIFactory4> _dxgiFactory;
+        private ComPtrField<IDXGISwapChain3> _swapChain;
         private ID3D12ResourceBuffer3 _renderTargets;
-        private ID3D12Resource* _depthStencil;
-        private ID3D12DescriptorHeap* _rtvHeap;
-        private ID3D12DescriptorHeap* _dsvHeap;
-        private ID3D12CommandQueue* _commandQueue;
+        private ComPtrField<ID3D12Resource> _depthStencil;
+        private ComPtrField<ID3D12DescriptorHeap> _rtvHeap;
+        private ComPtrField<ID3D12DescriptorHeap> _dsvHeap;
+        private ComPtrField<ID3D12CommandQueue> _commandQueue;
         private ID3D12CommandAllocatorBuffer3 _commandAllocators;
         private DXGI_FORMAT _backBufferFormat;
         private DXGI_FORMAT _depthBufferFormat;
@@ -91,7 +91,7 @@ namespace UWPPlayground.Common
         private bool _deviceRemoved;
 
         // CPU/GPU Synchronization.
-        private ID3D12Fence* _fence;
+        private ComPtrField<ID3D12Fence> _fence;
         private UInt64Buffer3 _fenceValues;
         private IntPtr _fenceEvent;
 
@@ -130,13 +130,13 @@ namespace UWPPlayground.Common
 
             public ID3D12Resource* this[int index]
             {
-                get { fixed (ID3D12Resource** p = &_1) return p[index]; }
-                set { fixed (ID3D12Resource** p = &_1) p[index] = value; }
+                get { fixed (IntPtr* p = &Unsafe.As<ComPtrField<ID3D12Resource>, IntPtr>(ref _1)) return (ID3D12Resource*)p[index]; }
+                set { fixed (IntPtr* p = &Unsafe.As<ComPtrField<ID3D12Resource>, IntPtr>(ref _1)) p[index] = (IntPtr)value; }
             }
 
-            public ID3D12Resource* _1;
-            public ID3D12Resource* _2;
-            public ID3D12Resource* _3;
+            public ComPtrField<ID3D12Resource> _1;
+            public ComPtrField<ID3D12Resource> _2;
+            public ComPtrField<ID3D12Resource> _3;
         }
 
         [SuppressMessage("ReSharper", "InconsistentNaming")]
@@ -146,13 +146,13 @@ namespace UWPPlayground.Common
 
             public ID3D12CommandAllocator* this[int index]
             {
-                get { fixed (ID3D12CommandAllocator** p = &_1) return p[index]; }
-                set { fixed (ID3D12CommandAllocator** p = &_1) p[index] = value; }
+                get { fixed (IntPtr* p = &Unsafe.As<ComPtrField<ID3D12CommandAllocator>, IntPtr>(ref _1)) return (ID3D12CommandAllocator*)p[index]; }
+                set { fixed (IntPtr* p = &Unsafe.As<ComPtrField<ID3D12CommandAllocator>, IntPtr>(ref _1)) p[index] = (IntPtr)value; }
             }
 
-            public ID3D12CommandAllocator* _1;
-            public ID3D12CommandAllocator* _2;
-            public ID3D12CommandAllocator* _3;
+            public ComPtrField<ID3D12CommandAllocator> _1;
+            public ComPtrField<ID3D12CommandAllocator> _2;
+            public ComPtrField<ID3D12CommandAllocator> _3;
         }
         #endregion
 
@@ -175,159 +175,139 @@ namespace UWPPlayground.Common
 #if DEBUG
             Guid iid;
             {
-                ID3D12Debug* debugController = null;
-                try
-                {
+                using ComPtr<ID3D12Debug> debugController = null;
 
-                    iid = D3D12.IID_ID3D12Debug;
-                    if (SUCCEEDED(D3D12.D3D12GetDebugInterface(&iid, (void**)&debugController)))
-                    {
-                        debugController->EnableDebugLayer();
-                    }
-                }
-                finally
+                iid = D3D12.IID_ID3D12Debug;
+                if (SUCCEEDED(D3D12.D3D12GetDebugInterface(&iid, (void**)debugController.GetAddressOf())))
                 {
-                    Release(debugController);
+                    debugController.Get()->EnableDebugLayer();
                 }
             }
 #endif
             iid = DXGI.IID_IDXGIFactory4;
-            fixed (IDXGIFactory4** p = &_dxgiFactory)
+            fixed (IDXGIFactory4** p = _dxgiFactory)
             {
                 DirectXHelper.ThrowIfFailed(DXGI.CreateDXGIFactory1(&iid, (void**)p));
             }
 
-            IDXGIAdapter1* adapter = null;
-            try
+            ComPtr<IDXGIAdapter1> adapter = null;
+            GetHardwareAdapter(adapter.GetAddressOf());
+
+            HRESULT hr;
+
+            fixed (ID3D12Device** p = _d3dDevice)
             {
-                GetHardwareAdapter(&adapter);
+                iid = D3D12.IID_ID3D12Device;
+                hr = D3D12.D3D12CreateDevice(
+                    (IUnknown*)adapter,
+                    D3D_FEATURE_LEVEL.D3D_FEATURE_LEVEL_11_0,
+                    &iid,
+                    (void**)p
+                );
 
-                HRESULT hr;
-
-                fixed (ID3D12Device** p = &_d3dDevice)
+#if DEBUG
+                if (FAILED(hr))
                 {
-                    iid = D3D12.IID_ID3D12Device;
+                    using ComPtr<IDXGIAdapter> warpAdapter = null;
+
+                    iid = DXGI.IID_IDXGIAdapter;
+                    DirectXHelper.ThrowIfFailed(_dxgiFactory.Get()->EnumWarpAdapter(&iid, (void**)warpAdapter.GetAddressOf()));
+
+                    iid = D3D12.IID_ID3D12Device1;
                     hr = D3D12.D3D12CreateDevice(
-                        (IUnknown*)adapter,
+                        warpAdapter,
                         D3D_FEATURE_LEVEL.D3D_FEATURE_LEVEL_11_0,
                         &iid,
                         (void**)p
                     );
-
-#if DEBUG
-                    if (FAILED(hr))
-                    {
-                        IDXGIAdapter* warpAdapter = null;
-                        try
-                        {
-                            iid = DXGI.IID_IDXGIAdapter;
-                            DirectXHelper.ThrowIfFailed(_dxgiFactory->EnumWarpAdapter(&iid, (void**)&warpAdapter));
-
-                            iid = D3D12.IID_ID3D12Device1;
-                            hr = D3D12.D3D12CreateDevice(
-                                (IUnknown*)warpAdapter,
-                                D3D_FEATURE_LEVEL.D3D_FEATURE_LEVEL_11_0,
-                                &iid,
-                                (void**)p
-                            );
-                        }
-                        finally
-                        {
-                            Release(warpAdapter);
-                        }
-                    }
+                }
 #endif
-                }
+            }
 
-                DirectXHelper.ThrowIfFailed(hr);
+            DirectXHelper.ThrowIfFailed(hr);
 
-                D3D12_COMMAND_QUEUE_DESC queueDesc;
-                queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAGS.D3D12_COMMAND_QUEUE_FLAG_NONE;
-                queueDesc.Type = D3D12_COMMAND_LIST_TYPE.D3D12_COMMAND_LIST_TYPE_DIRECT;
+            D3D12_COMMAND_QUEUE_DESC queueDesc;
+            queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAGS.D3D12_COMMAND_QUEUE_FLAG_NONE;
+            queueDesc.Type = D3D12_COMMAND_LIST_TYPE.D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-                fixed (ID3D12CommandQueue** p = &_commandQueue)
+            fixed (ID3D12CommandQueue** p = _commandQueue)
+            {
+                iid = D3D12.IID_ID3D12CommandQueue;
+                DirectXHelper.ThrowIfFailed(_d3dDevice.Get()->CreateCommandQueue(&queueDesc, &iid, (void**)p));
+                DirectXHelper.NameObject(_commandQueue, nameof(_commandQueue));
+            }
+
+            D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
+            rtvHeapDesc.NumDescriptors = FrameCount;
+            rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE.D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+            rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAGS.D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+            fixed (ID3D12DescriptorHeap** p = _rtvHeap)
+            {
+                iid = D3D12.IID_ID3D12DescriptorHeap;
+                DirectXHelper.ThrowIfFailed(_d3dDevice.Get()->CreateDescriptorHeap(&rtvHeapDesc, &iid, (void**)p));
+                DirectXHelper.NameObject(_rtvHeap, nameof(_rtvHeap));
+            }
+
+            _rtvDescriptorSize =
+                _d3dDevice.Get()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE.D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+            D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc;
+            dsvHeapDesc.NumDescriptors = 1;
+            dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE.D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+            dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAGS.D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+            fixed (ID3D12DescriptorHeap** p = _dsvHeap)
+            {
+                iid = D3D12.IID_ID3D12DescriptorHeap;
+                DirectXHelper.ThrowIfFailed(_d3dDevice.Get()->CreateDescriptorHeap(&dsvHeapDesc, &iid, (void**)p));
+                DirectXHelper.NameObject(_dsvHeap, nameof(_dsvHeap));
+            }
+
+            fixed (void* pBuffer = &Unsafe.As<ID3D12CommandAllocatorBuffer3, IntPtr>(ref _commandAllocators))
+            {
+                ID3D12CommandAllocator** p = (ID3D12CommandAllocator**)pBuffer;
+                iid = D3D12.IID_ID3D12CommandAllocator;
+                for (int n = 0; n < FrameCount; n++)
                 {
-                    iid = D3D12.IID_ID3D12CommandQueue;
-                    DirectXHelper.ThrowIfFailed(_d3dDevice->CreateCommandQueue(&queueDesc, &iid, (void**)p));
-                    DirectXHelper.NameObject(_commandQueue, nameof(_commandQueue));
-                }
 
-                D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-                rtvHeapDesc.NumDescriptors = FrameCount;
-                rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE.D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-                rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAGS.D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-
-                fixed (ID3D12DescriptorHeap** p = &_rtvHeap)
-                {
-                    iid = D3D12.IID_ID3D12DescriptorHeap;
-                    DirectXHelper.ThrowIfFailed(_d3dDevice->CreateDescriptorHeap(&rtvHeapDesc, &iid, (void**)p));
-                    DirectXHelper.NameObject(_rtvHeap, nameof(_rtvHeap));
-                }
-
-                _rtvDescriptorSize =
-                    _d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE.D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-                D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc;
-                dsvHeapDesc.NumDescriptors = 1;
-                dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE.D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-                dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAGS.D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-
-                fixed (ID3D12DescriptorHeap** p = &_dsvHeap)
-                {
-                    iid = D3D12.IID_ID3D12DescriptorHeap;
-                    DirectXHelper.ThrowIfFailed(_d3dDevice->CreateDescriptorHeap(&dsvHeapDesc, &iid, (void**)p));
-                    DirectXHelper.NameObject(_dsvHeap, nameof(_dsvHeap));
-                }
-
-                fixed (ID3D12CommandAllocatorBuffer3* pBuff = &_commandAllocators)
-                {
-                    ID3D12CommandAllocator** p = (ID3D12CommandAllocator**)pBuff;
-                    iid = D3D12.IID_ID3D12CommandAllocator;
-                    for (int n = 0; n < FrameCount; n++)
-                    {
-
-                        DirectXHelper.ThrowIfFailed(_d3dDevice->CreateCommandAllocator(
-                            D3D12_COMMAND_LIST_TYPE.D3D12_COMMAND_LIST_TYPE_DIRECT,
-                            &iid,
-                            (void**)(p + n)));
-                    }
-                }
-
-                fixed (ID3D12Fence** p = &_fence)
-                {
-                    iid = D3D12.IID_ID3D12Fence;
-                    DirectXHelper.ThrowIfFailed(
-                        _d3dDevice->CreateFence(_fenceValues[(int)_currentFrame],
-                            D3D12_FENCE_FLAGS.D3D12_FENCE_FLAG_NONE,
-                            &iid,
-                            (void**)p));
-                    DirectXHelper.NameObject(_fence, nameof(_fence));
-                    _fenceValues[(int)_currentFrame]++;
-                }
-
-                _fenceEvent = Kernel32.CreateEvent(null, 0, 0, null);
-                if (_fenceEvent == IntPtr.Zero)
-                {
-                    DirectXHelper.ThrowIfFailed(Marshal.GetLastWin32Error());
+                    DirectXHelper.ThrowIfFailed(_d3dDevice.Get()->CreateCommandAllocator(
+                        D3D12_COMMAND_LIST_TYPE.D3D12_COMMAND_LIST_TYPE_DIRECT,
+                        &iid,
+                        (void**)(p + n)));
                 }
             }
-            finally
+
+            fixed (ID3D12Fence** p = _fence)
             {
-                Release(adapter);
+                iid = D3D12.IID_ID3D12Fence;
+                DirectXHelper.ThrowIfFailed(
+                    _d3dDevice.Get()->CreateFence(_fenceValues[_currentFrame],
+                        D3D12_FENCE_FLAGS.D3D12_FENCE_FLAG_NONE,
+                        &iid,
+                        (void**)p));
+                DirectXHelper.NameObject(_fence, nameof(_fence));
+                _fenceValues[_currentFrame]++;
+            }
+
+            _fenceEvent = Kernel32.CreateEvent(null, 0, 0, null);
+            if (_fenceEvent == IntPtr.Zero)
+            {
+                DirectXHelper.ThrowIfFailed(Marshal.GetLastWin32Error());
             }
         }
 
         private void GetHardwareAdapter(IDXGIAdapter1** ppAdapter)
         {
-            IDXGIAdapter1* adapter;
+            using ComPtr<IDXGIAdapter1> adapter = null;
             *ppAdapter = null;
 
             for (uint adapterIndex = 0;
-                DXGI_ERROR_NOT_FOUND != _dxgiFactory->EnumAdapters1(adapterIndex, &adapter);
+                DXGI_ERROR_NOT_FOUND != _dxgiFactory.Get()->EnumAdapters1(adapterIndex, adapter.GetAddressOf());
                 adapterIndex++)
             {
                 DXGI_ADAPTER_DESC1 desc;
-                adapter->GetDesc1(&desc);
+                adapter.Get()->GetDesc1(&desc);
 
                 if (((DXGI_ADAPTER_FLAG)desc.Flags & DXGI_ADAPTER_FLAG.DXGI_ADAPTER_FLAG_SOFTWARE) != 0)
                 {
@@ -341,7 +321,7 @@ namespace UWPPlayground.Common
                 }
             }
 
-            *ppAdapter = adapter;
+            *ppAdapter = adapter.Detach();
         }
 
         private void CreateDeviceIndependentResources()
@@ -375,7 +355,7 @@ namespace UWPPlayground.Common
 
             if (_swapChain != null)
             {
-                HRESULT hr = _swapChain->ResizeBuffers(FrameCount, backBufferWidth, backBufferHeight, _backBufferFormat,
+                HRESULT hr = _swapChain.Get()->ResizeBuffers(FrameCount, backBufferWidth, backBufferHeight, _backBufferFormat,
                     0);
 
                 if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
@@ -410,27 +390,22 @@ namespace UWPPlayground.Common
                 swapChainDesc.Scaling = scaling;
                 swapChainDesc.AlphaMode = DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_IGNORE;
 
-                IDXGISwapChain1* swapChain = null;
-                try
                 {
+                    using ComPtr<IDXGISwapChain1> swapChain = null;
                     IntPtr pWindow = Marshal.GetIUnknownForObject(_window);
                     DirectXHelper.ThrowIfFailed(
-                        _dxgiFactory->CreateSwapChainForCoreWindow(
+                        _dxgiFactory.Get()->CreateSwapChainForCoreWindow(
                             (IUnknown*)_commandQueue,
                             (IUnknown*)pWindow,
                             &swapChainDesc,
                             null,
-                            &swapChain));
+                            swapChain.GetAddressOf()));
 
-                    fixed (IDXGISwapChain3** p = &_swapChain)
+                    fixed (IDXGISwapChain3** p = _swapChain)
                     {
                         Guid iid = DXGI.IID_IDXGISwapChain3;
-                        DirectXHelper.ThrowIfFailed(swapChain->QueryInterface(&iid, (void**)p));
+                        DirectXHelper.ThrowIfFailed(swapChain.Get()->QueryInterface(&iid, (void**)p));
                     }
-                }
-                finally
-                {
-                    Release(swapChain);
                 }
             }
 
@@ -456,22 +431,22 @@ namespace UWPPlayground.Common
                     throw new Exception(); // TODO
             }
 
-            DirectXHelper.ThrowIfFailed(_swapChain->SetRotation(displayRotation));
+            DirectXHelper.ThrowIfFailed(_swapChain.Get()->SetRotation(displayRotation));
 
             {
-                _currentFrame = (int)_swapChain->GetCurrentBackBufferIndex();
+                _currentFrame = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
                 D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptor;
-                _rtvHeap->GetCPUDescriptorHandleForHeapStart(&rtvDescriptor);
+                _rtvHeap.Get()->GetCPUDescriptorHandleForHeapStart(&rtvDescriptor);
 
-                fixed (ID3D12ResourceBuffer3* pBuffer = &_renderTargets)
+                fixed (void* pBuffer = &Unsafe.As<ID3D12ResourceBuffer3, IntPtr>(ref _renderTargets))
                 {
                     var p = (ID3D12Resource**)pBuffer;
 
                     Guid iid = D3D12.IID_ID3D12Resource;
                     for (var n = 0; n < FrameCount; n++)
                     {
-                        DirectXHelper.ThrowIfFailed(_swapChain->GetBuffer((uint)n, &iid, (void**)(p + n)));
-                        _d3dDevice->CreateRenderTargetView(
+                        DirectXHelper.ThrowIfFailed(_swapChain.Get()->GetBuffer((uint)n, &iid, (void**)(p + n)));
+                        _d3dDevice.Get()->CreateRenderTargetView(
                             _renderTargets[n],
                             null,
                             rtvDescriptor);
@@ -494,10 +469,10 @@ namespace UWPPlayground.Common
 
                 D3D12_CLEAR_VALUE depthOptimizedClearValue = CD3DX12_CLEAR_VALUE.Create(_depthBufferFormat, 1, 0);
 
-                fixed (ID3D12Resource** p = &_depthStencil)
+                fixed (ID3D12Resource** p = _depthStencil)
                 {
                     Guid iid = D3D12.IID_ID3D12Resource;
-                    DirectXHelper.ThrowIfFailed(_d3dDevice->CreateCommittedResource(
+                    DirectXHelper.ThrowIfFailed(_d3dDevice.Get()->CreateCommittedResource(
                         &depthHeapProperties,
                         D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
                         &depthResourceDesc,
@@ -514,8 +489,8 @@ namespace UWPPlayground.Common
                     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION.D3D12_DSV_DIMENSION_TEXTURE2D;
                     dsvDesc.Flags = D3D12_DSV_FLAGS.D3D12_DSV_FLAG_NONE;
                     D3D12_CPU_DESCRIPTOR_HANDLE handle;
-                    _dsvHeap->GetCPUDescriptorHandleForHeapStart(&handle);
-                    _d3dDevice->CreateDepthStencilView(_depthStencil, &dsvDesc, handle);
+                    _dsvHeap.Get()->GetCPUDescriptorHandleForHeapStart(&handle);
+                    _d3dDevice.Get()->CreateDepthStencilView(_depthStencil, &dsvDesc, handle);
 
                 }
             }
@@ -654,52 +629,36 @@ namespace UWPPlayground.Common
         {
             DXGI_ADAPTER_DESC previousDesc;
             {
-                IDXGIAdapter1* previousDefaultAdapter = null;
-                try
-                {
-                    DirectXHelper.ThrowIfFailed(_dxgiFactory->EnumAdapters1(0, &previousDefaultAdapter));
-                    DirectXHelper.ThrowIfFailed(previousDefaultAdapter->GetDesc(&previousDesc));
-                }
-                finally
-                {
-
-                    Release(previousDefaultAdapter);
-                }
+                using ComPtr<IDXGIAdapter1> previousDefaultAdapter = null;
+                DirectXHelper.ThrowIfFailed(_dxgiFactory.Get()->EnumAdapters1(0, previousDefaultAdapter.GetAddressOf()));
+                DirectXHelper.ThrowIfFailed(previousDefaultAdapter.Get()->GetDesc(&previousDesc));
             }
 
             DXGI_ADAPTER_DESC currentDesc;
             {
-                IDXGIFactory4* currrentDxgiFactory = null;
-                IDXGIAdapter1* currentDefaultAdapter = null;
+                using ComPtr<IDXGIFactory4> currrentDxgiFactory = null;
+                using ComPtr<IDXGIAdapter1> currentDefaultAdapter = null;
 
-                try
+                Guid iid = DXGI.IID_IDXGIFactory4;
+                DirectXHelper.ThrowIfFailed(DXGI.CreateDXGIFactory1(&iid, (void**)currrentDxgiFactory.GetAddressOf()));
+
+
+                DirectXHelper.ThrowIfFailed(currrentDxgiFactory.Get()->EnumAdapters1(0, currentDefaultAdapter.GetAddressOf()));
+
+                DirectXHelper.ThrowIfFailed(currentDefaultAdapter.Get()->GetDesc(&currentDesc));
+
+                if (previousDesc.AdapterLuid.LowPart != currentDesc.AdapterLuid.LowPart ||
+                    previousDesc.AdapterLuid.HighPart != currentDesc.AdapterLuid.HighPart ||
+                    FAILED(_d3dDevice.Get()->GetDeviceRemovedReason()))
                 {
-                    Guid iid = DXGI.IID_IDXGIFactory4;
-                    DirectXHelper.ThrowIfFailed(DXGI.CreateDXGIFactory1(&iid, (void**)&currrentDxgiFactory));
-
-
-                    DirectXHelper.ThrowIfFailed(currrentDxgiFactory->EnumAdapters1(0, &currentDefaultAdapter));
-
-                    DirectXHelper.ThrowIfFailed(currentDefaultAdapter->GetDesc(&currentDesc));
-
-                    if (previousDesc.AdapterLuid.LowPart != currentDesc.AdapterLuid.LowPart ||
-                        previousDesc.AdapterLuid.HighPart != currentDesc.AdapterLuid.HighPart ||
-                        FAILED(_d3dDevice->GetDeviceRemovedReason()))
-                    {
-                        _deviceRemoved = true;
-                    }
-                }
-                finally
-                {
-                    Release(currrentDxgiFactory);
-                    Release(currentDefaultAdapter);
+                    _deviceRemoved = true;
                 }
             }
         }
 
         public void Present()
         {
-            HRESULT hr = _swapChain->Present(1, 0);
+            HRESULT hr = _swapChain.Get()->Present(1, 0);
 
             if (hr == TerraFX.Interop.Windows.DXGI_ERROR_DEVICE_REMOVED || hr == TerraFX.Interop.Windows.DXGI_ERROR_DEVICE_RESET)
             {
@@ -714,9 +673,9 @@ namespace UWPPlayground.Common
 
         public void WaitForGpu()
         {
-            DirectXHelper.ThrowIfFailed(_commandQueue->Signal(_fence, _fenceValues[_currentFrame]));
+            DirectXHelper.ThrowIfFailed(_commandQueue.Get()->Signal(_fence, _fenceValues[_currentFrame]));
 
-            DirectXHelper.ThrowIfFailed(_fence->SetEventOnCompletion(_fenceValues[_currentFrame], _fenceEvent));
+            DirectXHelper.ThrowIfFailed(_fence.Get()->SetEventOnCompletion(_fenceValues[_currentFrame], _fenceEvent));
 
             // TODO - proper call is 'WaitForSingleObjectEx(_fenceEvent, INFINITE, FALSE)'
             Kernel32.WaitForSingleObject(_fenceEvent, TerraFX.Interop.Windows.INFINITE);
@@ -728,13 +687,13 @@ namespace UWPPlayground.Common
         {
             ulong currentFenceValue = _fenceValues[_currentFrame];
 
-            DirectXHelper.ThrowIfFailed(_commandQueue->Signal(_fence, currentFenceValue));
+            DirectXHelper.ThrowIfFailed(_commandQueue.Get()->Signal(_fence, currentFenceValue));
 
-            _currentFrame = (int)_swapChain->GetCurrentBackBufferIndex();
+            _currentFrame = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
 
-            if (_fence->GetCompletedValue() < _fenceValues[_currentFrame])
+            if (_fence.Get()->GetCompletedValue() < _fenceValues[_currentFrame])
             {
-                DirectXHelper.ThrowIfFailed(_fence->SetEventOnCompletion(_fenceValues[_currentFrame], _fenceEvent));
+                DirectXHelper.ThrowIfFailed(_fence.Get()->SetEventOnCompletion(_fenceValues[_currentFrame], _fenceEvent));
 
                 // TODO - proper call is 'WaitForSingleObjectEx(_fenceEvent, INFINITE, FALSE)'
                 Kernel32.WaitForSingleObject(_fenceEvent, TerraFX.Interop.Windows.INFINITE);
@@ -769,32 +728,32 @@ namespace UWPPlayground.Common
         public D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTargetView()
         {
             D3D12_CPU_DESCRIPTOR_HANDLE handle;
-            _rtvHeap->GetCPUDescriptorHandleForHeapStart(&handle);
+            _rtvHeap.Get()->GetCPUDescriptorHandleForHeapStart(&handle);
             return CD3DX12_CPU_DESCRIPTOR_HANDLE.Create(handle, _currentFrame, _rtvDescriptorSize);
         }
 
         public D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView()
         {
             D3D12_CPU_DESCRIPTOR_HANDLE handle;
-            _dsvHeap->GetCPUDescriptorHandleForHeapStart(&handle);
+            _dsvHeap.Get()->GetCPUDescriptorHandleForHeapStart(&handle);
             return handle;
         }
 
         private void ReleaseUnmanagedResources()
         {
-            _d3dDevice->Release();
-            _dxgiFactory->Release();
-            _swapChain->Release();
+            _d3dDevice.Dispose();
+            _dxgiFactory.Dispose();
+            _swapChain.Dispose();
 
             for (var i = 0; i < _renderTargets.Length; i++)
             {
                 _renderTargets[i]->Release();
             }
 
-            _depthStencil->Release();
-            _rtvHeap->Release();
-            _dsvHeap->Release();
-            _commandQueue->Release();
+            _depthStencil.Dispose();
+            _rtvHeap.Dispose();
+            _dsvHeap.Dispose();
+            _commandQueue.Dispose();
 
             for (var i = 0; i < _commandAllocators.Length; i++)
             {
@@ -802,7 +761,7 @@ namespace UWPPlayground.Common
             }
 
             // CPU/GPU Synchronization.
-            _fence->Release();
+            _fence.Dispose();
         }
 
         public void Dispose()
