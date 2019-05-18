@@ -212,6 +212,9 @@
       <HintPath>..\terrafx\artifacts\bin\sources\TerraFX.Provider.D3D12\Debug\netcoreapp3.0\TerraFX.Utilities.dll</HintPath>
     </Reference>
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Common\PIX\" />
+  </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>
   </PropertyGroup>

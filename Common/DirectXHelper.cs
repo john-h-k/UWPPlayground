@@ -34,11 +34,21 @@ namespace UWPPlayground.Common
 
         static unsafe DirectXHelper()
         {
-            CornflowerBlue = (float*) Marshal.AllocHGlobal(sizeof(float) * 4);
+            CornflowerBlue = (float*)Marshal.AllocHGlobal(sizeof(float) * 4);
             CornflowerBlue[0] = 0.392156899f;
             CornflowerBlue[1] = 0.584313750f;
             CornflowerBlue[2] = 0.929411829f;
             CornflowerBlue[3] = 1.000000000f;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [DebuggerHidden]
+        public static unsafe void ReleaseCom(void* com)
+        {
+            if (com != null)
+            {
+                ((IUnknown*)com)->Release();
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -89,7 +99,7 @@ namespace UWPPlayground.Common
                 throw new COMException($"Unknown exception occured with HRESULT {hr:X8} - \"" +
                                        $"{value}\"", hr);
             }
-            else 
+            else
             {
                 throw new COMException($"Unknown exception occured with HRESULT {hr:X8}", hr);
             }

@@ -52,7 +52,7 @@ namespace UWPPlayground.Content
         private D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
         private D3D12_INDEX_BUFFER_VIEW _indexBufferView;
 
-        private bool _loadingComplete  = false;
+        private bool _loadingComplete = false;
         private readonly float _radiansPerSecond;
         private bool _tracking;
         private bool _rotating;
@@ -106,7 +106,7 @@ namespace UWPPlayground.Content
             ID3D12Device* d3dDevice = _deviceResources.D3DDevice;
 
             {
-                D3D12_DESCRIPTOR_RANGE range = 
+                D3D12_DESCRIPTOR_RANGE range =
                     CD3DX12_DESCRIPTOR_RANGE.Create(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
                 CD3DX12_ROOT_PARAMETER.InitAsDescriptorTable(out D3D12_ROOT_PARAMETER parameter, 1, &range, D3D12_SHADER_VISIBILITY_VERTEX);
 
@@ -131,7 +131,7 @@ namespace UWPPlayground.Content
                 NameObject(_rootSignature, nameof(_rootSignature));
             }
 
-            
+
         }
 
         public unsafe void CreateDeviceDependentResources221()
@@ -234,13 +234,7 @@ namespace UWPPlayground.Content
                 byte* destination = _mappedConstantBuffer
                                     + (_deviceResources.CurrentFrameIndex * AlignedConstantBufferSize);
 
-                fixed (void* p = &_constantBufferData)
-                {
-
-                    Unsafe.CopyBlockUnaligned(destination,
-                        p,
-                        (uint) sizeof(ModelViewProjectionConstantBuffer));
-                }
+                Unsafe.WriteUnaligned(destination, _constantBufferData);
             }
         }
 
@@ -286,8 +280,7 @@ namespace UWPPlayground.Content
 
                 _commandList.Get()->ClearRenderTargetView(renderTargetView, CornflowerBlue, 0, null);
                 _commandList.Get()->ClearDepthStencilView(depthStencilView, D3D12_CLEAR_FLAG_DEPTH,
-                1, 0, 0,
-                null);
+                1, 0, 0, null);
 
                 _commandList.Get()->OMSetRenderTargets(1, &renderTargetView, FALSE, &depthStencilView);
 

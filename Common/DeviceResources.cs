@@ -404,6 +404,7 @@ namespace UWPPlayground.Common
 
             for (int n = 0; n < FrameCount; n++)
             {
+                DirectXHelper.ReleaseCom(_renderTargets[n]);
                 _renderTargets[n] = null;
                 _fenceValues[n] = _fenceValues[_currentFrame];
             }
