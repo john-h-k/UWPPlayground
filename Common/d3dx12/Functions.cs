@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using TerraFX.Interop;
@@ -49,7 +50,7 @@ namespace UWPPlayground.Common.d3dx12
                 return 0;
             }
 
-            void* pMem = (void*) Marshal.AllocHGlobal((IntPtr) MemToAlloc);
+            void* pMem = UnsafeNativeMethods.HeapAlloc(UnsafeNativeMethods.GetProcessHeap(), 0, (IntPtr)MemToAlloc);
 
             if (pMem == null)
             {
@@ -71,7 +72,7 @@ namespace UWPPlayground.Common.d3dx12
 
             ulong Result = UpdateSubresources(pCmdList, pDestinationResource, pIntermediate, FirstSubresource,
                 NumSubresources, RequiredSize, pLayouts, pNumRows, pRowSizesInBytes, pSrcData);
-            Marshal.FreeHGlobal((IntPtr) pMem);
+            UnsafeNativeMethods.HeapFree(UnsafeNativeMethods.GetProcessHeap(), 0, pMem);
             return Result;
         }
 
@@ -190,15 +191,54 @@ namespace UWPPlayground.Common.d3dx12
         {
             for (uint z = 0; z < NumSlices; ++z)
             {
-                byte* pDestSlice = (byte*) (pDest->pData) + (ulong)(UIntPtr)((ulong)pDest->SlicePitch * z);
-                byte* pSrcSlice = (byte*) (pSrc->pData) + (ulong)(UIntPtr)((ulong)pSrc->SlicePitch * z);
+                byte* pDestSlice = (byte*) (pDest->pData) + (ulong)pDest->SlicePitch * z;
+                byte* pSrcSlice = (byte*) (pSrc->pData) + (ulong)pSrc->SlicePitch * z;
                 for (uint y = 0; y < NumRows; ++y)
                 {
-                    Buffer.MemoryCopy(pDestSlice + (ulong)(UIntPtr)((ulong)pDest->RowPitch * y),
+                    Buffer.MemoryCopy(source: pDestSlice + (ulong)pDest->RowPitch * y,
                         pSrcSlice + (ulong)pSrc->RowPitch * y,
                         (ulong)RowSizeInBytes, (ulong)RowSizeInBytes);
                 }
             }
+        }
+
+        private static class UnsafeNativeMethods
+        {
+            [SuppressMessage("ReSharper", "InconsistentNaming")]
+            public enum HeapAllocFlags : uint
+            {
+                HEAP_GENERATE_EXCEPTIONS = 0x00000004,
+                HEAP_NO_SERIALIZE = 0x00000001,
+                HEAP_ZERO_MEMORY = 0x00000008
+            }
+
+            [SuppressMessage("ReSharper", "InconsistentNaming")]
+            public enum HeapFreeFlags : uint
+            {
+                HEAP_NO_SERIALIZE = HeapAllocFlags.HEAP_NO_SERIALIZE
+            }
+
+            [DllImport("kernel32.dll", 
+                EntryPoint = "HeapAlloc", 
+                CallingConvention = CallingConvention.Winapi,
+                SetLastError = true, 
+                PreserveSig = true)]
+            public static extern void* HeapAlloc(IntPtr hHeap, HeapAllocFlags dwFlags, IntPtr dwBytes);
+
+            [DllImport("kernel32.dll",
+                EntryPoint = "HeapFree",
+                CallingConvention = CallingConvention.Winapi,
+                SetLastError = true,
+                PreserveSig = true)]
+            public static extern uint HeapFree(
+                IntPtr hHeap,
+                HeapFreeFlags dwFlags,
+                void* lpMem
+            );
+
+            [DllImport("kernel32.dll", EntryPoint = "GetProcessHeap", CallingConvention = CallingConvention.Winapi,
+                SetLastError = true, PreserveSig = true)]
+            public static extern IntPtr GetProcessHeap();
         }
     }
 }

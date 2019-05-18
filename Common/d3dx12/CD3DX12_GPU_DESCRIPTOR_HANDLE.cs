@@ -36,7 +36,7 @@ namespace UWPPlayground.Common.d3dx12
             handle.ptr += (ulong)offsetInDescriptors * descriptorIncrementSize;
         }
 
-        public static void Offset(this D3D12_GPU_DESCRIPTOR_HANDLE handle, int offsetScaledByIncrementSize)
+        public static void Offset(ref this D3D12_GPU_DESCRIPTOR_HANDLE handle, int offsetScaledByIncrementSize)
         {
             handle.ptr += (uint)offsetScaledByIncrementSize;
         }

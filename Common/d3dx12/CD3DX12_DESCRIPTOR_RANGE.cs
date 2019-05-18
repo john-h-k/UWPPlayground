@@ -11,7 +11,7 @@ using TerraFX.Interop;
 namespace UWPPlayground.Common.d3dx12
 {
     [SuppressMessage("ReSharper", "InconsistentNaming")]
-    public struct CD3DX12_DESCRIPTOR_RANGE
+    public static class CD3DX12_DESCRIPTOR_RANGE
     {
         public static D3D12_DESCRIPTOR_RANGE Create(in D3D12_DESCRIPTOR_RANGE o)
         {

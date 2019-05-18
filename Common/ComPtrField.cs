@@ -5,23 +5,16 @@ using TerraFX.Interop;
 
 namespace UWPPlayground.Common
 {
-    [StructLayout(LayoutKind.Explicit)]
     public unsafe struct ComPtrField<T> where T : unmanaged
     {
-        [FieldOffset(0)]
-        private IntPtr _intPtr;
-        [FieldOffset(0)]
         private T* _ptr;
 
         public ComPtrField(T* ptr)
         {
-            _intPtr = default;
             _ptr = ptr;
         }
 
         public static implicit operator ComPtrField<T>(void* value) => new ComPtrField<T>((T*)value);
-
-        public static implicit operator T* (ComPtrField<T> value) => value._ptr;
 
         public static implicit operator ComPtrField<T>(ComPtr<T> value) => new ComPtrField<T>(value.Detach());
 

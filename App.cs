@@ -11,6 +11,9 @@ using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
 using TerraFX.Interop;
+using static TerraFX.Interop.Windows;
+using static TerraFX.Interop.DXGIDebug;
+using static TerraFX.Interop.DXGI;
 using UWPPlayground.Common;
 
 namespace UWPPlayground
@@ -43,7 +46,7 @@ namespace UWPPlayground
             applicationView.Activated += OnActivated;
             CoreApplication.Suspending += OnSuspending;
             CoreApplication.Resuming += OnResuming;
-            
+
         }
 
         public void SetWindow(CoreWindow window)
@@ -73,8 +76,7 @@ namespace UWPPlayground
                 {
                     CoreWindow.GetForCurrentThread().Dispatcher.ProcessEvents(CoreProcessEventsOption.ProcessAllIfPresent);
 
-                    ID3D12CommandQueue* commandQueue = GetDeviceResources().GetCommandQueue();
-                     
+                    ID3D12CommandQueue* commandQueue = GetDeviceResources().CommandQueue;
                     _main.Update();
 
                     if (_main.Render())
@@ -97,11 +99,8 @@ namespace UWPPlayground
         {
             SuspendingDeferral deferral = e.SuspendingOperation.GetDeferral();
 
-            Task.Run(() =>
-            {
-                _main.OnSuspending();
-                deferral.Complete();
-            });
+            _main.OnSuspending();
+            deferral.Complete();
         }
 
         private void OnResuming(object sender, object e)
@@ -148,7 +147,7 @@ namespace UWPPlayground
 
         private DeviceResources GetDeviceResources()
         {
-            if (_deviceResources != null && _deviceResources.IsDeviceRemoved())
+            if (_deviceResources != null && _deviceResources.IsDeviceRemoved)
             {
                 // All references to the existing D3D device must be released before a new device
                 // can be created.
@@ -157,7 +156,13 @@ namespace UWPPlayground
                 _main.OnDeviceRemoved();
 
 #if DEBUG
-                // TODO, DEBUG SDK layer
+                ComPtr<IDXGIDebug1> dxgiDebug = default;
+                Guid iid = IID_IDXGIDebug1;
+                if (SUCCEEDED(DXGIGetDebugInterface1(0, &iid, (void**)dxgiDebug.GetAddressOf())))
+                {
+                    dxgiDebug.Get()->ReportLiveObjects(new Guid(0xe48ae283, 0xda80, 0x490b, 0x87, 0xe6, 0x43, 0xe9, 0xa9, 0xcf, 0xda, 0x8), 
+                        DXGI_DEBUG_RLO_FLAGS.DXGI_DEBUG_RLO_SUMMARY | DXGI_DEBUG_RLO_FLAGS.DXGI_DEBUG_RLO_IGNORE_INTERNAL);
+                }
 #endif
             }
 
@@ -165,7 +170,7 @@ namespace UWPPlayground
             {
                 _deviceResources = new DeviceResources();
                 _deviceResources.SetWindow(CoreWindow.GetForCurrentThread());
-               _main.CreateRenderers(_deviceResources);
+                _main.CreateRenderers(_deviceResources);
             }
             return _deviceResources;
         }

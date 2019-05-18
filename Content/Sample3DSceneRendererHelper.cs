@@ -22,52 +22,31 @@ namespace UWPPlayground.Content
 {
     public partial class Sample3DSceneRenderer
     {
-        static unsafe Sample3DSceneRenderer()
+        public static void CopyBytesToBlob(out ComPtrField<ID3DBlob> blob, UIntPtr size, byte[] bytes)
         {
-            pAsciiColorString = (sbyte*)Marshal.AllocHGlobal(AsciiColorString.Length);
-            Unsafe.CopyBlockUnaligned(ref Unsafe.As<sbyte, byte>(ref AsciiColorString[0]),
-                ref *(byte*)pAsciiColorString, (uint)AsciiColorString.Length);
-
-            pAsciiPositionString = (sbyte*)Marshal.AllocHGlobal(AsciiPositionString.Length);
-            Unsafe.CopyBlockUnaligned(ref Unsafe.As<sbyte, byte>(ref AsciiPositionString[0]),
-                ref *(byte*)pAsciiPositionString, (uint)AsciiPositionString.Length);
+            Span<byte> span = CreateBlob(out blob, size);
+            bytes.CopyTo(span);
         }
 
-        private static readonly sbyte[] AsciiColorString =
-        {
-                (sbyte) 'C', (sbyte) 'O', (sbyte) 'L', (sbyte) 'O', (sbyte) 'R'
-            };
-
-        private static readonly sbyte[] AsciiPositionString =
-        {
-                (sbyte) 'P', (sbyte) 'O', (sbyte) 'S', (sbyte) 'I', (sbyte) 'T',
-                (sbyte) 'I', (sbyte) 'O', (sbyte) 'N'
-            };
-
-        private static readonly unsafe sbyte* pAsciiColorString;
-        private static readonly unsafe sbyte* pAsciiPositionString;
-
-        public unsafe void ReadVertexShader()
+        public async Task ReadVertexShader()
         {
             const string fileName = "SampleVertexShader.cso";
 
-            UIntPtr size = (UIntPtr)new FileInfo(fileName).Length;
-            Span<byte> span = CreateBlob(out _vertexShader, size);
-            byte[] shader = File.ReadAllBytes(fileName);
-            shader.CopyTo(span);
+            var size = (UIntPtr)new FileInfo(fileName).Length;
+            byte[] shader = await File.ReadAllBytesAsync(fileName);
+            CopyBytesToBlob(out _vertexShader, size, shader);
         }
 
-        public unsafe void ReadPixelShader()
+        public async Task ReadPixelShader()
         {
             const string fileName = "SamplePixelShader.cso";
 
-            UIntPtr size = (UIntPtr)new FileInfo(fileName).Length;
-            Span<byte> span = CreateBlob(out _pixelShader, size);
-            byte[] shader = File.ReadAllBytes(fileName);
-            shader.CopyTo(span);
+            var size = (UIntPtr)new FileInfo(fileName).Length;
+            byte[] shader = await File.ReadAllBytesAsync(fileName);
+            CopyBytesToBlob(out _pixelShader, size, shader);
         }
 
-        private static unsafe Span<byte> CreateBlob(out ID3DBlob* ppBlob, UIntPtr size)
+        private static unsafe Span<byte> CreateBlob(out ComPtrField<ID3DBlob> ppBlob, UIntPtr size)
         {
 #if DEBUG
             ppBlob = null;
@@ -78,7 +57,7 @@ namespace UWPPlayground.Content
 
             ppBlob = p;
 
-            return new Span<byte>(ppBlob->GetBufferPointer(), (int)ppBlob->GetBufferSize());
+            return new Span<byte>(ppBlob.Get()->GetBufferPointer(), (int)ppBlob.Get()->GetBufferSize());
         }
 
         private unsafe void CreatePipelineDescAndPipelineState()
@@ -107,7 +86,7 @@ namespace UWPPlayground.Content
             };
 
             D3D12_INPUT_ELEMENT_DESC* pInputLayout = stackalloc D3D12_INPUT_ELEMENT_DESC[]
-                {
+            {
                 new D3D12_INPUT_ELEMENT_DESC
                 {
                     SemanticName = pPosition,
@@ -136,12 +115,12 @@ namespace UWPPlayground.Content
                 pInputElementDescs = pInputLayout,
                 NumElements = 2
             };
-            state.pRootSignature = _rootSignature;
-            state.VS = CD3DX12_SHADER_BYTECODE.Create(_vertexShader->GetBufferPointer(),
-                _vertexShader->GetBufferSize());
+            state.pRootSignature = _rootSignature.Get();
+            state.VS = CD3DX12_SHADER_BYTECODE.Create(_vertexShader.Get()->GetBufferPointer(),
+                _vertexShader.Get()->GetBufferSize());
 
-            state.PS = CD3DX12_SHADER_BYTECODE.Create(_pixelShader->GetBufferPointer(),
-                _pixelShader->GetBufferSize());
+            state.PS = CD3DX12_SHADER_BYTECODE.Create(_pixelShader.Get()->GetBufferPointer(),
+                _pixelShader.Get()->GetBufferSize());
 
             state.RasterizerState = CD3DX12_RASTERIZER_DESC.Create(D3D12_DEFAULT);
             state.BlendState = CD3DX12_BLEND_DESC.Create(D3D12_DEFAULT);
@@ -150,49 +129,56 @@ namespace UWPPlayground.Content
             state.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE.D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
             state.NumRenderTargets = 1;
             state.RTVFormats = default; // TODO redundant init - any solution?
-            state.RTVFormats[0] = _deviceResources.GetBackBufferFormat();
-            state.DSVFormat = _deviceResources.GetDepthBufferFormat();
+            state.RTVFormats[0] = _deviceResources.BackBufferFormat;
+            state.DSVFormat = _deviceResources.DepthBufferFormat;
             state.SampleDesc.Count = 1;
 
-            fixed (ID3D12PipelineState** p = &_pipelineState)
             {
                 Guid iid = IID_ID3D12PipelineState;
+                ID3D12PipelineState* pipelineState;
                 ThrowIfFailed(
-                    _deviceResources.GetD3DDevice()->CreateGraphicsPipelineState(
+                    _deviceResources.D3DDevice->CreateGraphicsPipelineState(
                         &state,
                         &iid,
-                        (void**)p)
+                        (void**)&pipelineState)
                 );
+                _pipelineState = pipelineState;
             }
         }
 
-        public void CreatePipelineState()
+        public async Task CreatePipelineState(Task vertexShaderTask, Task pixelShaderTask)
         {
+            await vertexShaderTask;
+            await pixelShaderTask;
+
             CreatePipelineDescAndPipelineState();
         }
 
-        public void CreateRendererAssets()
+        public async Task CreateRendererAssets(Task pipelineTask)
         {
+            await pipelineTask;
             CreateAssets();
             _loadingComplete = true;
         }
 
         private unsafe void CreateAssets()
         {
-            ID3D12Device* d3dDevice = _deviceResources.GetD3DDevice();
+            ID3D12Device* d3dDevice = _deviceResources.D3DDevice;
 
             Guid iid;
-            fixed (ID3D12GraphicsCommandList** p = &_commandList)
+
             {
                 iid = IID_ID3D12GraphicsCommandList;
+                ID3D12GraphicsCommandList* commandList;
                 ThrowIfFailed(d3dDevice->CreateCommandList(
                     0,
                     D3D12_COMMAND_LIST_TYPE.D3D12_COMMAND_LIST_TYPE_DIRECT,
-                    _deviceResources.GetCommandAllocator(),
-                    _pipelineState,
+                    _deviceResources.CommandAllocator,
+                    _pipelineState.Get(),
                     &iid,
-                    (void**)p));
+                    (void**)&commandList));
 
+                _commandList = commandList;
                 NameObject(_commandList, nameof(_commandList));
             }
 
@@ -201,28 +187,26 @@ namespace UWPPlayground.Content
             VertexPositionColor* cubeVertices = stackalloc VertexPositionColor[(int)vertexPositionColorCount]
             {
                 new VertexPositionColor { pos = new Vector3(-0.5f, -0.5f, -0.5f), color = new Vector3(0.0f, 0.0f, 0.0f) },
-                new VertexPositionColor { pos = new Vector3(-0.5f, -0.5f, 0.5f), color = new Vector3(0.0f, 0.0f, 1.0f) },
-                new VertexPositionColor { pos = new Vector3(-0.5f, 0.5f, -0.5f), color = new Vector3(0.0f, 1.0f, 0.0f) },
-                new VertexPositionColor { pos = new Vector3(-0.5f, 0.5f, 0.5f), color = new Vector3(0.0f, 1.0f, 1.0f) },
-                new VertexPositionColor { pos = new Vector3(0.5f, -0.5f, -0.5f), color = new Vector3(1.0f, 0.0f, 0.0f) },
-                new VertexPositionColor { pos = new Vector3(0.5f, -0.5f, 0.5f), color = new Vector3(1.0f, 0.0f, 1.0f) },
-                new VertexPositionColor { pos = new Vector3(0.5f, 0.5f, -0.5f), color = new Vector3(1.0f, 1.0f, 0.0f) },
-                new VertexPositionColor { pos = new Vector3(0.5f, 0.5f, 0.5f), color = new Vector3(1.0f, 1.0f, 1.0f) }
+                new VertexPositionColor { pos = new Vector3(-0.5f, -0.5f,  0.5f), color = new Vector3(0.0f, 0.0f, 1.0f) },
+                new VertexPositionColor { pos = new Vector3(-0.5f,  0.5f, -0.5f), color = new Vector3(0.0f, 1.0f, 0.0f) },
+                new VertexPositionColor { pos = new Vector3(-0.5f,  0.5f,  0.5f), color = new Vector3(0.0f, 1.0f, 1.0f) },
+                new VertexPositionColor { pos = new Vector3( 0.5f, -0.5f, -0.5f), color = new Vector3(1.0f, 0.0f, 0.0f) },
+                new VertexPositionColor { pos = new Vector3( 0.5f, -0.5f,  0.5f), color = new Vector3(1.0f, 0.0f, 1.0f) },
+                new VertexPositionColor { pos = new Vector3( 0.5f,  0.5f, -0.5f), color = new Vector3(1.0f, 1.0f, 0.0f) },
+                new VertexPositionColor { pos = new Vector3( 0.5f,  0.5f,  0.5f), color = new Vector3(1.0f, 1.0f, 1.0f) }
             };
-            uint cubeVerticesSize = (uint)sizeof(VertexPositionColor) * vertexPositionColorCount;
-
             uint vertexBufferSize = (uint)sizeof(VertexPositionColor) * vertexPositionColorCount;
 
-            ID3D12Resource* vertexBufferUpload = default;
+            using ComPtr<ID3D12Resource> vertexBufferUpload = default;
 
             D3D12_HEAP_PROPERTIES defaultHeapProperties =
                 CD3DX12_HEAP_PROPERTIES.Create(D3D12_HEAP_TYPE.D3D12_HEAP_TYPE_DEFAULT);
 
             D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC.Buffer(vertexBufferSize);
 
-            fixed (ID3D12Resource** p = &_vertexBuffer)
             {
                 iid = IID_ID3D12Resource;
+                ID3D12Resource* vertexBuffer;
                 ThrowIfFailed(d3dDevice->CreateCommittedResource(
                     &defaultHeapProperties,
                     D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
@@ -230,7 +214,9 @@ namespace UWPPlayground.Content
                     D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_COPY_DEST,
                     null,
                     &iid,
-                    (void**)p));
+                    (void**)&vertexBuffer));
+
+                _vertexBuffer = vertexBuffer;
             }
 
             iid = IID_ID3D12Resource;
@@ -244,7 +230,7 @@ namespace UWPPlayground.Content
                 D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_GENERIC_READ,
                 null,
                 &iid,
-                (void**)&vertexBufferUpload));
+                (void**)vertexBufferUpload.GetAddressOf()));
 
             NameObject(_vertexBuffer, nameof(_vertexBuffer));
 
@@ -255,18 +241,18 @@ namespace UWPPlayground.Content
                 vertexData.SlicePitch = vertexData.RowPitch;
 
                 Functions.UpdateSubresources(
-                    _commandList,
-                    _vertexBuffer,
-                    vertexBufferUpload,
+                    _commandList.Get(),
+                    _vertexBuffer.Get(),
+                    vertexBufferUpload.Get(),
                     0, 0, 1,
                     &vertexData);
 
                 D3D12_RESOURCE_BARRIER vertexBufferResourceBarrier =
-                    CD3DX12_RESOURCE_BARRIER.Transition(_vertexBuffer,
+                    CD3DX12_RESOURCE_BARRIER.Transition(_vertexBuffer.Get(),
                         D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_COPY_DEST,
                         D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
-                _commandList->ResourceBarrier(1, &vertexBufferResourceBarrier);
+                _commandList.Get()->ResourceBarrier(1, &vertexBufferResourceBarrier);
             }
 
             const int cubeIndicesCount = 36;
@@ -314,16 +300,15 @@ namespace UWPPlayground.Content
                 7,
                 5,
             };
-            uint cubeIndicesSize = sizeof(ushort) * cubeIndicesCount;
-            uint indexBufferSize = cubeIndicesCount;
+            const uint indexBufferSize = sizeof(ushort) * cubeIndicesCount;
 
-            ID3D12Resource* indexBufferUpload;
+            using var indexBufferUpload = new ComPtr<ID3D12Resource>();
 
             D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC.Buffer(indexBufferSize);
 
-            fixed (ID3D12Resource** p = &_indexBuffer)
             {
                 iid = IID_ID3D12Resource;
+                ID3D12Resource* indexBuffer;
                 ThrowIfFailed(d3dDevice->CreateCommittedResource(
                     &defaultHeapProperties,
                     D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
@@ -331,8 +316,8 @@ namespace UWPPlayground.Content
                     D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_COPY_DEST,
                     null,
                     &iid,
-                    (void**)p));
-
+                    (void**)&indexBuffer));
+                _indexBuffer = indexBuffer;
             }
 
             iid = IID_ID3D12Resource;
@@ -343,7 +328,7 @@ namespace UWPPlayground.Content
                 D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_GENERIC_READ,
                 null,
                 &iid,
-                (void**)&indexBufferUpload));
+                (void**)indexBufferUpload.GetAddressOf()));
 
             NameObject(_indexBuffer, nameof(_indexBuffer));
 
@@ -354,18 +339,18 @@ namespace UWPPlayground.Content
                 indexData.SlicePitch = indexData.RowPitch;
 
                 Functions.UpdateSubresources(
-                    _commandList,
-                    _indexBuffer,
-                    indexBufferUpload,
+                    _commandList.Get(),
+                    _indexBuffer.Get(),
+                    indexBufferUpload.Get(),
                     0, 0, 1,
                     &indexData);
 
                 D3D12_RESOURCE_BARRIER indexBufferResourceBarrier =
-                    CD3DX12_RESOURCE_BARRIER.Transition(_indexBuffer,
+                    CD3DX12_RESOURCE_BARRIER.Transition(_indexBuffer.Get(),
                         D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_COPY_DEST,
                         D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_INDEX_BUFFER);
 
-                _commandList->ResourceBarrier(1, &indexBufferResourceBarrier);
+                _commandList.Get()->ResourceBarrier(1, &indexBufferResourceBarrier);
             }
 
             {
@@ -374,10 +359,11 @@ namespace UWPPlayground.Content
                 heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE.D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
                 heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAGS.D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
-                fixed (ID3D12DescriptorHeap** p = &_cbvHeap)
                 {
+                    ID3D12DescriptorHeap* cbvHeap;
                     iid = IID_ID3D12DescriptorHeap;
-                    ThrowIfFailed(d3dDevice->CreateDescriptorHeap(&heapDesc, &iid, (void**)p));
+                    ThrowIfFailed(d3dDevice->CreateDescriptorHeap(&heapDesc, &iid, (void**)&cbvHeap));
+                    _cbvHeap = cbvHeap;
                     NameObject(_cbvHeap, nameof(_cbvHeap));
                 }
             }
@@ -385,7 +371,7 @@ namespace UWPPlayground.Content
             D3D12_RESOURCE_DESC constantBufferDesc = CD3DX12_RESOURCE_DESC.Buffer(
                 DeviceResources.FrameCount * AlignedConstantBufferSize);
 
-            fixed (ID3D12Resource** p = &_constantBuffer)
+            ID3D12Resource* constantBuffer;
             {
                 iid = IID_ID3D12Resource;
                 ThrowIfFailed(d3dDevice->CreateCommittedResource(
@@ -395,14 +381,15 @@ namespace UWPPlayground.Content
                     D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_GENERIC_READ,
                     null,
                     &iid,
-                    (void**)p));
+                    (void**)&constantBuffer));
+                _constantBuffer = constantBuffer;
 
                 NameObject(_constantBuffer, nameof(_constantBuffer));
             }
 
-            D3D12_GPU_VIRTUAL_ADDRESS cbvGpuAddress = _constantBuffer->GetGPUVirtualAddress();
+            D3D12_GPU_VIRTUAL_ADDRESS cbvGpuAddress = _constantBuffer.Get()->GetGPUVirtualAddress();
             D3D12_CPU_DESCRIPTOR_HANDLE cbvCpuHandle;
-            _cbvHeap->GetCPUDescriptorHandleForHeapStart(&cbvCpuHandle);
+            _cbvHeap.Get()->GetCPUDescriptorHandleForHeapStart(&cbvCpuHandle);
             _cbvDescriptorSize =
                 d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE
                     .D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -421,24 +408,25 @@ namespace UWPPlayground.Content
 
             fixed (byte** p = &_mappedConstantBuffer)
             {
-                ThrowIfFailed(_constantBuffer->Map(0, &readRange, (void**)p));
-                Unsafe.InitBlockUnaligned(*p, 0, DeviceResources.FrameCount * AlignedConstantBufferSize);
+                ThrowIfFailed(_constantBuffer.Get()->Map(0, &readRange, (void**)p));
+                Unsafe.InitBlockUnaligned(_mappedConstantBuffer, 0, DeviceResources.FrameCount * AlignedConstantBufferSize);
             }
 
-            ThrowIfFailed(_commandList->Close());
+            ThrowIfFailed(_commandList.Get()->Close());
             const int ppCommandListCount = 1;
             ID3D12CommandList** ppCommandLists = stackalloc ID3D12CommandList*[ppCommandListCount]
             {
-                (ID3D12CommandList*)_commandList
+                (ID3D12CommandList*)_commandList.Get()
             };
-            _deviceResources.GetCommandQueue()->ExecuteCommandLists(ppCommandListCount, ppCommandLists);
 
-            _vertexBufferView.BufferLocation = _vertexBuffer->GetGPUVirtualAddress();
+            _deviceResources.CommandQueue->ExecuteCommandLists(ppCommandListCount, ppCommandLists);
+
+            _vertexBufferView.BufferLocation = _vertexBuffer.Get()->GetGPUVirtualAddress();
             _vertexBufferView.SizeInBytes = (uint)sizeof(VertexPositionColor);
-            _vertexBufferView.SizeInBytes = cubeVerticesSize;
+            _vertexBufferView.SizeInBytes = vertexBufferSize;
 
-            _indexBufferView.BufferLocation = _indexBuffer->GetGPUVirtualAddress();
-            _indexBufferView.SizeInBytes = cubeIndicesSize;
+            _indexBufferView.BufferLocation = _indexBuffer.Get()->GetGPUVirtualAddress();
+            _indexBufferView.SizeInBytes = indexBufferSize;
             _indexBufferView.Format = DXGI_FORMAT_R16_UINT;
 
             _deviceResources.WaitForGpu();

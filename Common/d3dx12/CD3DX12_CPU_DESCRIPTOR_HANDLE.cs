@@ -15,22 +15,22 @@ namespace UWPPlayground.Common.d3dx12
 
         public static D3D12_CPU_DESCRIPTOR_HANDLE Create(in D3D12_CPU_DESCRIPTOR_HANDLE other, int offsetScaledByIncrementSize)
         {
-            return new D3D12_CPU_DESCRIPTOR_HANDLE { ptr = (UIntPtr)((ulong)other.ptr + (ulong)offsetScaledByIncrementSize) };
+            return new D3D12_CPU_DESCRIPTOR_HANDLE { ptr = (UIntPtr)((byte*)other.ptr + (long)offsetScaledByIncrementSize) };
         }
 
         public static D3D12_CPU_DESCRIPTOR_HANDLE Create(in D3D12_CPU_DESCRIPTOR_HANDLE other, int offsetInDescriptors, uint descriptorIncrementSize)
         {
-            return new D3D12_CPU_DESCRIPTOR_HANDLE { ptr = (UIntPtr)((ulong)other.ptr + ((ulong)offsetInDescriptors * descriptorIncrementSize)) };
+            return new D3D12_CPU_DESCRIPTOR_HANDLE { ptr = (UIntPtr)((long)other.ptr + (offsetInDescriptors * descriptorIncrementSize)) };
         }
 
-        public static void Offset(this D3D12_CPU_DESCRIPTOR_HANDLE obj, int offsetInDescriptors, uint descriptorIncrementSize)
+        public static void Offset(ref this D3D12_CPU_DESCRIPTOR_HANDLE obj, int offsetInDescriptors, uint descriptorIncrementSize)
         {
-            obj.ptr = (UIntPtr)((ulong)obj.ptr + (ulong)offsetInDescriptors * descriptorIncrementSize);
+            obj.ptr = (UIntPtr)((byte*)obj.ptr + offsetInDescriptors * descriptorIncrementSize);
         }
 
-        public static void Offset(this D3D12_CPU_DESCRIPTOR_HANDLE obj, int offsetScaledByIncrementSize)
+        public static void Offset(ref this D3D12_CPU_DESCRIPTOR_HANDLE obj, int offsetScaledByIncrementSize)
         {
-            obj.ptr = (UIntPtr)((ulong)obj.ptr + (ulong)offsetScaledByIncrementSize);
+            obj.ptr = (UIntPtr)((byte*)obj.ptr + (ulong)offsetScaledByIncrementSize);
         }
 
         public static D3D12_CPU_DESCRIPTOR_HANDLE InitOffsetted(in D3D12_CPU_DESCRIPTOR_HANDLE @base, int offsetScaledByIncrementSize)
