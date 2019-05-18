@@ -126,7 +126,7 @@ namespace UWPPlayground.Content
 
                 Guid iid = IID_ID3D12RootSignature;
                 ID3D12RootSignature* rootSignature;
-                ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature.Get()->GetBufferPointer(), pSignature.Get()->GetBufferSize(), &iid, (void**)&rootSignature));
+                ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature.Ptr->GetBufferPointer(), pSignature.Ptr->GetBufferSize(), &iid, (void**)&rootSignature));
                 _rootSignature = rootSignature;
                 NameObject(_rootSignature, nameof(_rootSignature));
             }
@@ -163,13 +163,13 @@ namespace UWPPlayground.Content
                     pSignature.GetAddressOf(),
                     pError.GetAddressOf()));
 
-                ID3D12RootSignature* p = _rootSignature.Get();
+                ID3D12RootSignature* p = _rootSignature.Ptr;
                 {
                     Guid iid = IID_ID3D12RootSignature;
                     ThrowIfFailed(d3dDevice->CreateRootSignature(
                         0,
-                        pSignature.Get()->GetBufferPointer(),
-                        pSignature.Get()->GetBufferSize(),
+                        pSignature.Ptr->GetBufferPointer(),
+                        pSignature.Ptr->GetBufferSize(),
                         &iid,
                         (void**)&p
                     ));
@@ -245,27 +245,27 @@ namespace UWPPlayground.Content
 
             ThrowIfFailed(_deviceResources.CommandAllocator->Reset());
 
-            ThrowIfFailed(_commandList.Get()->Reset(_deviceResources.CommandAllocator, _pipelineState.Get()));
+            ThrowIfFailed(_commandList.Ptr->Reset(_deviceResources.CommandAllocator, _pipelineState.Ptr));
 
             {
-                _commandList.Get()->SetGraphicsRootSignature(_rootSignature.Get());
+                _commandList.Ptr->SetGraphicsRootSignature(_rootSignature.Ptr);
                 const uint ppHeapsCount = 1;
                 ID3D12DescriptorHeap** ppHeaps = stackalloc ID3D12DescriptorHeap*[(int)ppHeapsCount]
                 {
-                    _cbvHeap.Get()
+                    _cbvHeap.Ptr
                 };
 
-                _commandList.Get()->SetDescriptorHeaps(ppHeapsCount, ppHeaps);
+                _commandList.Ptr->SetDescriptorHeaps(ppHeapsCount, ppHeaps);
 
                 D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
-                _cbvHeap.Get()->GetGPUDescriptorHandleForHeapStart(&gpuHandle);
+                _cbvHeap.Ptr->GetGPUDescriptorHandleForHeapStart(&gpuHandle);
                 gpuHandle.ptr += _deviceResources.CurrentFrameIndex * _cbvDescriptorSize;
-                _commandList.Get()->SetGraphicsRootDescriptorTable(0, gpuHandle);
+                _commandList.Ptr->SetGraphicsRootDescriptorTable(0, gpuHandle);
 
                 D3D12_VIEWPORT viewport = _deviceResources.ScreenViewport;
-                _commandList.Get()->RSSetViewports(1, &viewport);
+                _commandList.Ptr->RSSetViewports(1, &viewport);
                 D3D12_RECT rect = _scissorRect;
-                _commandList.Get()->RSSetScissorRects(1, &rect);
+                _commandList.Ptr->RSSetScissorRects(1, &rect);
 
                 D3D12_RESOURCE_BARRIER renderTargetResourceBarrier =
                     CD3DX12_RESOURCE_BARRIER.Transition(
@@ -273,25 +273,25 @@ namespace UWPPlayground.Content
                         D3D12_RESOURCE_STATE_PRESENT,
                         D3D12_RESOURCE_STATE_RENDER_TARGET
                     );
-                _commandList.Get()->ResourceBarrier(1, &renderTargetResourceBarrier);
+                _commandList.Ptr->ResourceBarrier(1, &renderTargetResourceBarrier);
 
                 D3D12_CPU_DESCRIPTOR_HANDLE renderTargetView = _deviceResources.GetRenderTargetView();
                 D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = _deviceResources.GetDepthStencilView();
 
-                _commandList.Get()->ClearRenderTargetView(renderTargetView, CornflowerBlue, 0, null);
-                _commandList.Get()->ClearDepthStencilView(depthStencilView, D3D12_CLEAR_FLAG_DEPTH,
+                _commandList.Ptr->ClearRenderTargetView(renderTargetView, CornflowerBlue, 0, null);
+                _commandList.Ptr->ClearDepthStencilView(depthStencilView, D3D12_CLEAR_FLAG_DEPTH,
                 1, 0, 0, null);
 
-                _commandList.Get()->OMSetRenderTargets(1, &renderTargetView, FALSE, &depthStencilView);
+                _commandList.Ptr->OMSetRenderTargets(1, &renderTargetView, FALSE, &depthStencilView);
 
-                _commandList.Get()->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+                _commandList.Ptr->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
                 D3D12_VERTEX_BUFFER_VIEW vertexBufferView = _vertexBufferView;
                 D3D12_INDEX_BUFFER_VIEW indexBufferView = _indexBufferView;
-                _commandList.Get()->IASetVertexBuffers(0, 1, &vertexBufferView);
-                _commandList.Get()->IASetIndexBuffer(&indexBufferView);
+                _commandList.Ptr->IASetVertexBuffers(0, 1, &vertexBufferView);
+                _commandList.Ptr->IASetIndexBuffer(&indexBufferView);
 
-                _commandList.Get()->DrawIndexedInstanced(36, 1, 0, 0, 0);
+                _commandList.Ptr->DrawIndexedInstanced(36, 1, 0, 0, 0);
 
                 D3D12_RESOURCE_BARRIER presentResourceBarrier =
                         CD3DX12_RESOURCE_BARRIER.Transition(
@@ -299,15 +299,15 @@ namespace UWPPlayground.Content
                             D3D12_RESOURCE_STATE_RENDER_TARGET,
                             D3D12_RESOURCE_STATE_PRESENT);
 
-                _commandList.Get()->ResourceBarrier(1, &presentResourceBarrier);
+                _commandList.Ptr->ResourceBarrier(1, &presentResourceBarrier);
             }
 
-            ThrowIfFailed(_commandList.Get()->Close());
+            ThrowIfFailed(_commandList.Ptr->Close());
 
             const uint ppCommandListsCount = 1;
             ID3D12CommandList** ppCommandLists = stackalloc ID3D12CommandList*[(int)ppCommandListsCount]
             {
-                (ID3D12CommandList*)_commandList.Get()
+                (ID3D12CommandList*)_commandList.Ptr
             };
 
             _deviceResources.CommandQueue->ExecuteCommandLists(ppCommandListsCount, ppCommandLists);
@@ -390,7 +390,7 @@ namespace UWPPlayground.Content
             _constantBuffer.Dispose();
             _vertexShader.Dispose();
             _pixelShader.Dispose();
-            _constantBuffer.Get()->Unmap(0, null);
+            _constantBuffer.Ptr->Unmap(0, null);
             _mappedConstantBuffer = null;
 
             _disposed = true;

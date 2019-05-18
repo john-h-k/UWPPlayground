@@ -24,7 +24,7 @@ namespace UWPPlayground.Common
         public static implicit operator ComPtr<IUnknown>(ComPtr<T> value) => new ComPtr<IUnknown>((IUnknown*)value._ptr);
         public static implicit operator IUnknown* (ComPtr<T> value) => (IUnknown*)value._ptr;
 
-        public static bool operator ==(ComPtr<T> left, ComPtr<T> right) => left.Get() == right.Get();
+        public static bool operator ==(ComPtr<T> left, ComPtr<T> right) => left.Ptr == right.Ptr;
         public static bool operator !=(ComPtr<T> left, ComPtr<T> right) => !(left == right);
 
         public T* Detach()
@@ -34,7 +34,7 @@ namespace UWPPlayground.Common
             return (T*)temp;
         }
 
-        public T* Get() => (T*)_ptr;
+        public T* Ptr => (T*)_ptr;
 
         public T** GetAddressOf() => (T**)Unsafe.AsPointer(ref _ptr);
         public T** ReleaseGetAddressOf()

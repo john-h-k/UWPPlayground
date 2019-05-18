@@ -22,7 +22,7 @@ namespace UWPPlayground.Common
 
         public static implicit operator IUnknown* (ComPtrField<T> value) => (IUnknown*)value._ptr;
 
-        public static bool operator ==(ComPtrField<T> left, ComPtrField<T> right) => left.Get() == right.Get();
+        public static bool operator ==(ComPtrField<T> left, ComPtrField<T> right) => left.Ptr == right.Ptr;
 
         public static bool operator !=(ComPtrField<T> left, ComPtrField<T> right) => !(left == right);
 
@@ -33,7 +33,7 @@ namespace UWPPlayground.Common
             return temp;
         }
 
-        public T* Get() => _ptr;
+        public T* Ptr => _ptr;
         public ref T* GetPinnableReference()
         {
             fixed (T** p = &_ptr)

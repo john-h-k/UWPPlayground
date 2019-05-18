@@ -73,7 +73,7 @@ namespace UWPPlayground.Common
 #if DEBUG
             var mem = (void*)Marshal.AllocHGlobal(sizeof(char) * name.Length);
             name.AsSpan().CopyTo(new Span<char>(mem, name.Length));
-            ((ID3D12Object*)d3Dect.Get())->SetName((char*)mem);
+            ((ID3D12Object*)d3Dect.Ptr)->SetName((char*)mem);
 #endif
         }
 
@@ -82,7 +82,7 @@ namespace UWPPlayground.Common
 #if DEBUG
             var mem = (void*)Marshal.AllocHGlobal(sizeof(char) * name.Length);
             name.AsSpan().CopyTo(new Span<char>(mem, name.Length));
-            ((ID3D12Object*)d3Dect.Get())->SetName((char*)mem);
+            ((ID3D12Object*)d3Dect.Ptr)->SetName((char*)mem);
 #endif
         }
 

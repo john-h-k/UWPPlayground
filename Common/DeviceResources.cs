@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -234,15 +235,16 @@ namespace UWPPlayground.Common
 
         private void CreateDeviceResources()
         {
-#if DEBUG
             Guid iid;
+#if DEBUG
+            
             {
                 using ComPtr<ID3D12Debug> debugController = null;
 
                 iid = D3D12.IID_ID3D12Debug;
                 if (SUCCEEDED(D3D12.D3D12GetDebugInterface(&iid, (void**)debugController.GetAddressOf())))
                 {
-                    debugController.Get()->EnableDebugLayer();
+                    debugController.Ptr->EnableDebugLayer();
                 }
             }
 #endif
@@ -271,7 +273,7 @@ namespace UWPPlayground.Common
                     using ComPtr<IDXGIAdapter> warpAdapter = null;
 
                     iid = DXGI.IID_IDXGIAdapter;
-                    DirectXHelper.ThrowIfFailed(_dxgiFactory.Get()->EnumWarpAdapter(&iid, (void**)warpAdapter.GetAddressOf()));
+                    DirectXHelper.ThrowIfFailed(_dxgiFactory.Ptr->EnumWarpAdapter(&iid, (void**)warpAdapter.GetAddressOf()));
 
                     iid = D3D12.IID_ID3D12Device1;
                     hr = D3D12.D3D12CreateDevice(
@@ -294,7 +296,7 @@ namespace UWPPlayground.Common
             ID3D12CommandQueue* commandQueue;
             {
                 iid = D3D12.IID_ID3D12CommandQueue;
-                DirectXHelper.ThrowIfFailed(_d3dDevice.Get()->CreateCommandQueue(&queueDesc, &iid, (void**)&commandQueue));
+                DirectXHelper.ThrowIfFailed(_d3dDevice.Ptr->CreateCommandQueue(&queueDesc, &iid, (void**)&commandQueue));
             }
             _commandQueue = commandQueue;
             DirectXHelper.NameObject(_commandQueue, nameof(_commandQueue));
@@ -307,13 +309,13 @@ namespace UWPPlayground.Common
             ID3D12DescriptorHeap* rtvHeap;
             {
                 iid = D3D12.IID_ID3D12DescriptorHeap;
-                DirectXHelper.ThrowIfFailed(_d3dDevice.Get()->CreateDescriptorHeap(&rtvHeapDesc, &iid, (void**)&rtvHeap));
+                DirectXHelper.ThrowIfFailed(_d3dDevice.Ptr->CreateDescriptorHeap(&rtvHeapDesc, &iid, (void**)&rtvHeap));
             }
             _rtvHeap = rtvHeap;
             DirectXHelper.NameObject(_rtvHeap, nameof(_rtvHeap));
 
             _rtvDescriptorSize =
-                _d3dDevice.Get()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE
+                _d3dDevice.Ptr->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE
                     .D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 
@@ -326,7 +328,7 @@ namespace UWPPlayground.Common
             ID3D12DescriptorHeap* dsvHeap;
             {
                 iid = D3D12.IID_ID3D12DescriptorHeap;
-                DirectXHelper.ThrowIfFailed(_d3dDevice.Get()->CreateDescriptorHeap(&dsvHeapDesc, &iid, (void**)&dsvHeap));
+                DirectXHelper.ThrowIfFailed(_d3dDevice.Ptr->CreateDescriptorHeap(&dsvHeapDesc, &iid, (void**)&dsvHeap));
             }
 
             _dsvHeap = dsvHeap;
@@ -339,7 +341,7 @@ namespace UWPPlayground.Common
                 for (var n = 0; n < FrameCount; n++)
                 {
 
-                    DirectXHelper.ThrowIfFailed(_d3dDevice.Get()->CreateCommandAllocator(
+                    DirectXHelper.ThrowIfFailed(_d3dDevice.Ptr->CreateCommandAllocator(
                         D3D12_COMMAND_LIST_TYPE.D3D12_COMMAND_LIST_TYPE_DIRECT,
                         &iid,
                         (void**)(p + n)));
@@ -350,7 +352,7 @@ namespace UWPPlayground.Common
             {
                 iid = D3D12.IID_ID3D12Fence;
                 DirectXHelper.ThrowIfFailed(
-                    _d3dDevice.Get()->CreateFence(_fenceValues[_currentFrame],
+                    _d3dDevice.Ptr->CreateFence(_fenceValues[_currentFrame],
                         D3D12_FENCE_FLAGS.D3D12_FENCE_FLAG_NONE,
                         &iid,
                         (void**)&fence));
@@ -372,11 +374,11 @@ namespace UWPPlayground.Common
             *ppAdapter = null;
 
             for (uint adapterIndex = 0;
-                DXGI_ERROR_NOT_FOUND != _dxgiFactory.Get()->EnumAdapters1(adapterIndex, adapter.GetAddressOf());
+                DXGI_ERROR_NOT_FOUND != _dxgiFactory.Ptr->EnumAdapters1(adapterIndex, adapter.GetAddressOf());
                 adapterIndex++)
             {
                 DXGI_ADAPTER_DESC1 desc;
-                adapter.Get()->GetDesc1(&desc);
+                adapter.Ptr->GetDesc1(&desc);
 
                 if (((DXGI_ADAPTER_FLAG)desc.Flags & DXGI_ADAPTER_FLAG.DXGI_ADAPTER_FLAG_SOFTWARE) != 0)
                 {
@@ -386,6 +388,7 @@ namespace UWPPlayground.Common
                 Guid iid = D3D12.IID_ID3D12Device;
                 if (SUCCEEDED(D3D12.D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL.D3D_FEATURE_LEVEL_11_0, &iid, null)))
                 {
+                    Debug.WriteLine(new string(desc.Description));
                     break;
                 }
             }
@@ -425,7 +428,7 @@ namespace UWPPlayground.Common
 
             if (_swapChain != null)
             {
-                HRESULT hr = _swapChain.Get()->ResizeBuffers(FrameCount, backBufferWidth, backBufferHeight, _backBufferFormat,
+                HRESULT hr = _swapChain.Ptr->ResizeBuffers(FrameCount, backBufferWidth, backBufferHeight, _backBufferFormat,
                     0);
 
                 if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
@@ -464,7 +467,7 @@ namespace UWPPlayground.Common
                     using ComPtr<IDXGISwapChain1> swapChain = null;
                     IntPtr pWindow = Marshal.GetIUnknownForObject(_window);
                     DirectXHelper.ThrowIfFailed(
-                        _dxgiFactory.Get()->CreateSwapChainForCoreWindow(
+                        _dxgiFactory.Ptr->CreateSwapChainForCoreWindow(
                             _commandQueue,
                             (IUnknown*)pWindow,
                             &swapChainDesc,
@@ -473,7 +476,7 @@ namespace UWPPlayground.Common
 
                     IDXGISwapChain3* swapChain3;
                     Guid iid = DXGI.IID_IDXGISwapChain3;
-                    DirectXHelper.ThrowIfFailed(swapChain.Get()->QueryInterface(&iid, (void**)&swapChain3));
+                    DirectXHelper.ThrowIfFailed(swapChain.Ptr->QueryInterface(&iid, (void**)&swapChain3));
                     _swapChain = swapChain3;
 
                 }
@@ -498,12 +501,12 @@ namespace UWPPlayground.Common
                     break;
             }
 
-            DirectXHelper.ThrowIfFailed(_swapChain.Get()->SetRotation(displayRotation));
+            DirectXHelper.ThrowIfFailed(_swapChain.Ptr->SetRotation(displayRotation));
 
             {
-                _currentFrame = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
+                _currentFrame = (int)_swapChain.Ptr->GetCurrentBackBufferIndex();
                 D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptor;
-                _rtvHeap.Get()->GetCPUDescriptorHandleForHeapStart(&rtvDescriptor);
+                _rtvHeap.Ptr->GetCPUDescriptorHandleForHeapStart(&rtvDescriptor);
 
                 fixed (void* pBuffer = & _renderTargets)
                 {
@@ -512,8 +515,8 @@ namespace UWPPlayground.Common
                     Guid iid = D3D12.IID_ID3D12Resource;
                     for (var n = 0; n < FrameCount; n++)
                     {
-                        DirectXHelper.ThrowIfFailed(_swapChain.Get()->GetBuffer((uint)n, &iid, (void**)&p[n]));
-                        _d3dDevice.Get()->CreateRenderTargetView(
+                        DirectXHelper.ThrowIfFailed(_swapChain.Ptr->GetBuffer((uint)n, &iid, (void**)&p[n]));
+                        _d3dDevice.Ptr->CreateRenderTargetView(
                             _renderTargets[n],
                             null,
                             rtvDescriptor);
@@ -539,7 +542,7 @@ namespace UWPPlayground.Common
                 fixed (ID3D12Resource** p = _depthStencil)
                 {
                     Guid iid = D3D12.IID_ID3D12Resource;
-                    DirectXHelper.ThrowIfFailed(_d3dDevice.Get()->CreateCommittedResource(
+                    DirectXHelper.ThrowIfFailed(_d3dDevice.Ptr->CreateCommittedResource(
                         &depthHeapProperties,
                         D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
                         &depthResourceDesc,
@@ -556,8 +559,8 @@ namespace UWPPlayground.Common
                     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION.D3D12_DSV_DIMENSION_TEXTURE2D;
                     dsvDesc.Flags = D3D12_DSV_FLAGS.D3D12_DSV_FLAG_NONE;
                     D3D12_CPU_DESCRIPTOR_HANDLE handle;
-                    _dsvHeap.Get()->GetCPUDescriptorHandleForHeapStart(&handle);
-                    _d3dDevice.Get()->CreateDepthStencilView(_depthStencil.Get(), &dsvDesc, handle);
+                    _dsvHeap.Ptr->GetCPUDescriptorHandleForHeapStart(&handle);
+                    _d3dDevice.Ptr->CreateDepthStencilView(_depthStencil.Ptr, &dsvDesc, handle);
 
                 }
             }
@@ -697,8 +700,8 @@ namespace UWPPlayground.Common
             DXGI_ADAPTER_DESC previousDesc;
             {
                 using ComPtr<IDXGIAdapter1> previousDefaultAdapter = null;
-                DirectXHelper.ThrowIfFailed(_dxgiFactory.Get()->EnumAdapters1(0, previousDefaultAdapter.GetAddressOf()));
-                DirectXHelper.ThrowIfFailed(previousDefaultAdapter.Get()->GetDesc(&previousDesc));
+                DirectXHelper.ThrowIfFailed(_dxgiFactory.Ptr->EnumAdapters1(0, previousDefaultAdapter.GetAddressOf()));
+                DirectXHelper.ThrowIfFailed(previousDefaultAdapter.Ptr->GetDesc(&previousDesc));
             }
 
             {
@@ -709,14 +712,14 @@ namespace UWPPlayground.Common
                 DirectXHelper.ThrowIfFailed(DXGI.CreateDXGIFactory1(&iid, (void**)currrentDxgiFactory.GetAddressOf()));
 
 
-                DirectXHelper.ThrowIfFailed(currrentDxgiFactory.Get()->EnumAdapters1(0, currentDefaultAdapter.GetAddressOf()));
+                DirectXHelper.ThrowIfFailed(currrentDxgiFactory.Ptr->EnumAdapters1(0, currentDefaultAdapter.GetAddressOf()));
 
                 DXGI_ADAPTER_DESC currentDesc;
-                DirectXHelper.ThrowIfFailed(currentDefaultAdapter.Get()->GetDesc(&currentDesc));
+                DirectXHelper.ThrowIfFailed(currentDefaultAdapter.Ptr->GetDesc(&currentDesc));
 
                 if (previousDesc.AdapterLuid.LowPart != currentDesc.AdapterLuid.LowPart ||
                     previousDesc.AdapterLuid.HighPart != currentDesc.AdapterLuid.HighPart ||
-                    FAILED(_d3dDevice.Get()->GetDeviceRemovedReason()))
+                    FAILED(_d3dDevice.Ptr->GetDeviceRemovedReason()))
                 {
                     _deviceRemoved = true;
                 }
@@ -725,7 +728,7 @@ namespace UWPPlayground.Common
 
         public void Present()
         {
-            HRESULT hr = _swapChain.Get()->Present(1, 0);
+            HRESULT hr = _swapChain.Ptr->Present(1, 0);
 
             if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
             {
@@ -740,9 +743,9 @@ namespace UWPPlayground.Common
 
         public void WaitForGpu()
         {
-            DirectXHelper.ThrowIfFailed(_commandQueue.Get()->Signal(_fence.Get(), _fenceValues[_currentFrame]));
+            DirectXHelper.ThrowIfFailed(_commandQueue.Ptr->Signal(_fence.Ptr, _fenceValues[_currentFrame]));
 
-            DirectXHelper.ThrowIfFailed(_fence.Get()->SetEventOnCompletion(_fenceValues[_currentFrame], _fenceEvent));
+            DirectXHelper.ThrowIfFailed(_fence.Ptr->SetEventOnCompletion(_fenceValues[_currentFrame], _fenceEvent));
 
             // TODO - proper call is 'WaitForSingleObjectEx(_fenceEvent, INFINITE, FALSE)'
             Kernel32.WaitForSingleObject(_fenceEvent, INFINITE);
@@ -754,14 +757,14 @@ namespace UWPPlayground.Common
         {
             ulong currentFenceValue = _fenceValues[_currentFrame];
 
-            DirectXHelper.ThrowIfFailed(_commandQueue.Get()->Signal(_fence.Get(), currentFenceValue));
+            DirectXHelper.ThrowIfFailed(_commandQueue.Ptr->Signal(_fence.Ptr, currentFenceValue));
 
-            _currentFrame = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
+            _currentFrame = (int)_swapChain.Ptr->GetCurrentBackBufferIndex();
 
-            ulong completedValue = _fence.Get()->GetCompletedValue();
+            ulong completedValue = _fence.Ptr->GetCompletedValue();
             if (completedValue < _fenceValues[_currentFrame])
             {
-                DirectXHelper.ThrowIfFailed(_fence.Get()->SetEventOnCompletion(_fenceValues[_currentFrame], _fenceEvent));
+                DirectXHelper.ThrowIfFailed(_fence.Ptr->SetEventOnCompletion(_fenceValues[_currentFrame], _fenceEvent));
 
                 // TODO - proper call is 'WaitForSingleObjectEx(_fenceEvent, INFINITE, FALSE)'
                 Kernel32.WaitForSingleObject(_fenceEvent, INFINITE);
@@ -780,11 +783,11 @@ namespace UWPPlayground.Common
         public bool IsDeviceRemoved => _deviceRemoved;
 
         // D3D Accessors.
-        public ID3D12Device* D3DDevice => _d3dDevice.Get();
-        public IDXGISwapChain3* SwapChain => _swapChain.Get();
+        public ID3D12Device* D3DDevice => _d3dDevice.Ptr;
+        public IDXGISwapChain3* SwapChain => _swapChain.Ptr;
         public ID3D12Resource* RenderTarget => _renderTargets[_currentFrame];
-        public ID3D12Resource* DepthStencil => _depthStencil.Get();
-        public ID3D12CommandQueue* CommandQueue => _commandQueue.Get();
+        public ID3D12Resource* DepthStencil => _depthStencil.Ptr;
+        public ID3D12CommandQueue* CommandQueue => _commandQueue.Ptr;
         public ID3D12CommandAllocator* CommandAllocator => _commandAllocators[_currentFrame];
         public DXGI_FORMAT BackBufferFormat => _backBufferFormat;
         public DXGI_FORMAT DepthBufferFormat => _depthBufferFormat;
@@ -796,14 +799,14 @@ namespace UWPPlayground.Common
         public D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTargetView()
         {
             D3D12_CPU_DESCRIPTOR_HANDLE handle;
-            _rtvHeap.Get()->GetCPUDescriptorHandleForHeapStart(&handle);
+            _rtvHeap.Ptr->GetCPUDescriptorHandleForHeapStart(&handle);
             return CD3DX12_CPU_DESCRIPTOR_HANDLE.Create(handle, _currentFrame, _rtvDescriptorSize);
         }
 
         public D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView()
         {
             D3D12_CPU_DESCRIPTOR_HANDLE handle;
-            _dsvHeap.Get()->GetCPUDescriptorHandleForHeapStart(&handle);
+            _dsvHeap.Ptr->GetCPUDescriptorHandleForHeapStart(&handle);
             return handle;
         }
 

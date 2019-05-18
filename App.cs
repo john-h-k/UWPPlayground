@@ -160,7 +160,7 @@ namespace UWPPlayground
                 Guid iid = IID_IDXGIDebug1;
                 if (SUCCEEDED(DXGIGetDebugInterface1(0, &iid, (void**)dxgiDebug.GetAddressOf())))
                 {
-                    dxgiDebug.Get()->ReportLiveObjects(new Guid(0xe48ae283, 0xda80, 0x490b, 0x87, 0xe6, 0x43, 0xe9, 0xa9, 0xcf, 0xda, 0x8), 
+                    dxgiDebug.Ptr->ReportLiveObjects(new Guid(0xe48ae283, 0xda80, 0x490b, 0x87, 0xe6, 0x43, 0xe9, 0xa9, 0xcf, 0xda, 0x8), 
                         DXGI_DEBUG_RLO_FLAGS.DXGI_DEBUG_RLO_SUMMARY | DXGI_DEBUG_RLO_FLAGS.DXGI_DEBUG_RLO_IGNORE_INTERNAL);
                 }
 #endif
