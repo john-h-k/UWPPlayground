@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Diagnostics;
+using System.IO;
 using TerraFX.Interop;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -10,18 +10,14 @@ using Windows.Storage;
 using UWPPlayground.Common;
 using UWPPlayground.Common.d3dx12;
 using static UWPPlayground.Common.DirectXHelper;
-using static TerraFX.Interop.D3D12;
-using static TerraFX.Interop.D3D12_ROOT_SIGNATURE_FLAGS;
-using Size = Windows.Foundation.Size;
-using D3D12_RECT = TerraFX.Interop.RECT;
 using static TerraFX.Interop.D3D_PRIMITIVE_TOPOLOGY;
-using static TerraFX.Interop.D3D_ROOT_SIGNATURE_VERSION;
 using static TerraFX.Interop.D3D12_CLEAR_FLAGS;
-using static TerraFX.Interop.D3D12_DESCRIPTOR_RANGE_TYPE;
 using static TerraFX.Interop.D3D12_RESOURCE_STATES;
-using static TerraFX.Interop.D3D12_SHADER_VISIBILITY;
 using static TerraFX.Interop.Windows;
 using static TerraFX.Utilities.ExceptionUtilities;
+
+using Size = Windows.Foundation.Size;
+using D3D12_RECT = TerraFX.Interop.RECT;
 
 namespace UWPPlayground.Content
 {
@@ -31,7 +27,7 @@ namespace UWPPlayground.Content
         private static readonly string TrackingKey = "Tracking";
         private bool _disposed;
 
-        public static readonly unsafe uint AlignedConstantBufferSize
+        private static readonly unsafe uint AlignedConstantBufferSize
             = ((uint)sizeof(ModelViewProjectionConstantBuffer) + 255U) & ~255U;
 
         private readonly DeviceResources _deviceResources;
@@ -52,24 +48,27 @@ namespace UWPPlayground.Content
         private D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
         private D3D12_INDEX_BUFFER_VIEW _indexBufferView;
 
-        private bool _loadingComplete = false;
+        private bool _loadingComplete;
         private readonly float _radiansPerSecond;
         private bool _tracking;
-        private bool _rotating;
+        private bool _rotating = true;
         private float _rotationY;
 
-        public Sample3DSceneRenderer(DeviceResources deviceResources)
+        public unsafe Sample3DSceneRenderer(DeviceResources deviceResources)
         {
             LoadState();
-            _constantBufferData = default;
-            _radiansPerSecond = 0.785398163F;
+            _loadingComplete = false;
+            _radiansPerSecond = MathF.PI / 4; // rotate 45 degrees per second
+            _rotationY = 0;
+            _tracking = false;
+            _mappedConstantBuffer = null;
             _deviceResources = deviceResources;
 
             CreateDeviceDependentResources();
             CreateWindowSizeDependentResources();
         }
 
-        public static void ThrowIfFailed(string methodName, int hr)
+        private static void ThrowIfFailed(string methodName, int hr)
         {
             if (FAILED(hr))
             {
@@ -77,7 +76,7 @@ namespace UWPPlayground.Content
             }
         }
 
-        public static void ThrowIfFailed(int hr)
+        private static void ThrowIfFailed(int hr)
         {
             if (FAILED(hr))
             {
@@ -85,109 +84,46 @@ namespace UWPPlayground.Content
             }
         }
 
-        public async void CreateDeviceDependentResources()
+        private async void CreateDeviceDependentResources()
         {
             CreateDeviceDependentResourcesInternal();
-            Task pipelineTask = CreatePipelineState(ReadVertexShader(), ReadPixelShader());
-            try
+
+            async Task ReadVertexShader()
             {
-                await CreateRendererAssets(pipelineTask);
-            }
-            catch (Exception e)
-            {
-                Debug.WriteLine("FATAL ERROR");
-                Debug.WriteLine(e);
-                Environment.Exit(0x2);
-            }
-        }
+                const string fileName = "SampleVertexShader.cso";
 
-        public unsafe void CreateDeviceDependentResourcesInternal()
-        {
-            ID3D12Device* d3dDevice = _deviceResources.D3DDevice;
+                var size = (UIntPtr) new FileInfo(fileName).Length;
+                byte[] shader = await File.ReadAllBytesAsync(fileName);
 
-            {
-                D3D12_DESCRIPTOR_RANGE range =
-                    CD3DX12_DESCRIPTOR_RANGE.Create(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-                CD3DX12_ROOT_PARAMETER.InitAsDescriptorTable(out D3D12_ROOT_PARAMETER parameter, 1, &range, D3D12_SHADER_VISIBILITY_VERTEX);
-
-                D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
-                    D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | // Only the input assembler stage needs access to the constant buffer.
-                    D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-                    D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-                    D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-                    D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
-
-                CD3DX12_ROOT_SIGNATURE_DESC.Init(out D3D12_ROOT_SIGNATURE_DESC descRootSignature, 1, &parameter, 0, null, rootSignatureFlags);
-
-                var pSignature = new ComPtr<ID3DBlob>();
-                var pError = new ComPtr<ID3DBlob>();
-
-                ThrowIfFailed(D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, pSignature.GetAddressOf(), pError.GetAddressOf()));
-
-                Guid iid = IID_ID3D12RootSignature;
-                ID3D12RootSignature* rootSignature;
-                ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature.Ptr->GetBufferPointer(), pSignature.Ptr->GetBufferSize(), &iid, (void**)&rootSignature));
-                _rootSignature = rootSignature;
-                NameObject(_rootSignature, nameof(_rootSignature));
-            }
-
-
-        }
-
-        public unsafe void CreateDeviceDependentResources221()
-        {
-            ID3D12Device* d3dDevice = _deviceResources.D3DDevice;
-
-            {
-                D3D12_DESCRIPTOR_RANGE range = CD3DX12_DESCRIPTOR_RANGE.Create(
-                    D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-
-                CD3DX12_ROOT_PARAMETER.InitAsDescriptorTable(out D3D12_ROOT_PARAMETER parameter, 1, &range,
-                    D3D12_SHADER_VISIBILITY_VERTEX);
-
-                D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
-                    D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-                    D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-                    D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-                    D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-                    D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
-
-                CD3DX12_ROOT_SIGNATURE_DESC.Init(out D3D12_ROOT_SIGNATURE_DESC descRootSignature, 1, &parameter, 0, null, rootSignatureFlags);
-
-                using ComPtr<ID3DBlob> pSignature = default;
-                using ComPtr<ID3DBlob> pError = default;
-
-                ThrowIfFailed(D3D12SerializeRootSignature(
-                    &descRootSignature,
-                    D3D_ROOT_SIGNATURE_VERSION_1,
-                    pSignature.GetAddressOf(),
-                    pError.GetAddressOf()));
-
-                ID3D12RootSignature* p = _rootSignature.Ptr;
+                unsafe
                 {
-                    Guid iid = IID_ID3D12RootSignature;
-                    ThrowIfFailed(d3dDevice->CreateRootSignature(
-                        0,
-                        pSignature.Ptr->GetBufferPointer(),
-                        pSignature.Ptr->GetBufferSize(),
-                        &iid,
-                        (void**)&p
-                    ));
-
-                    _rootSignature = p;
-
-                    NameObject(_rootSignature, nameof(_rootSignature));
+                    CopyBytesToBlob(out _vertexShader.GetPinnableReference(), size, shader);
                 }
             }
-        }
 
+            async Task PixelShader()
+            {
+                const string fileName = "SamplePixelShader.cso";
+
+                var size = (UIntPtr) new FileInfo(fileName).Length;
+                byte[] shader = await File.ReadAllBytesAsync(fileName);
+
+                unsafe
+                {
+                    CopyBytesToBlob(out _pixelShader.GetPinnableReference(), size, shader);
+                }
+            }
+
+            Task psoTask = CreatePipelineState(ReadVertexShader(), PixelShader());
+            await CreateRendererAssets(psoTask);
+        }
 
 
         public void CreateWindowSizeDependentResources()
         {
             Size outputSize = _deviceResources.OutputSize;
-            float aspectRatio = (float)outputSize.Width / (float)outputSize.Height;
-            float fovAngleY = 70.0F * (float)Math.PI / 180.0F;
+            var aspectRatio = (float)outputSize.Width / (float)outputSize.Height;
+            var fovAngleY = 70.0F * (float)Math.PI / 180.0F;
 
             D3D12_VIEWPORT viewport = _deviceResources.ScreenViewport;
 
@@ -226,7 +162,7 @@ namespace UWPPlayground.Content
             {
                 if (!_tracking && _rotating)
                 {
-                    float angle = (float)timer.ElapsedSeconds * _radiansPerSecond;
+                    var angle = (float)timer.ElapsedSeconds * _radiansPerSecond;
                     _rotationY += angle;
                     Rotate(_rotationY);
                 }
@@ -250,10 +186,7 @@ namespace UWPPlayground.Content
             {
                 _commandList.Ptr->SetGraphicsRootSignature(_rootSignature.Ptr);
                 const uint ppHeapsCount = 1;
-                ID3D12DescriptorHeap** ppHeaps = stackalloc ID3D12DescriptorHeap*[(int)ppHeapsCount]
-                {
-                    _cbvHeap.Ptr
-                };
+                ID3D12DescriptorHeap** ppHeaps = stackalloc ID3D12DescriptorHeap*[(int)ppHeapsCount] { _cbvHeap.Ptr };
 
                 _commandList.Ptr->SetDescriptorHeaps(ppHeapsCount, ppHeaps);
 
@@ -275,9 +208,10 @@ namespace UWPPlayground.Content
                     );
                 _commandList.Ptr->ResourceBarrier(1, &renderTargetResourceBarrier);
 
-                D3D12_CPU_DESCRIPTOR_HANDLE renderTargetView = _deviceResources.GetRenderTargetView();
-                D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = _deviceResources.GetDepthStencilView();
+                D3D12_CPU_DESCRIPTOR_HANDLE renderTargetView = _deviceResources.RenderTargetView;
+                D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = _deviceResources.DepthStencilView;
 
+                
                 _commandList.Ptr->ClearRenderTargetView(renderTargetView, CornflowerBlue, 0, null);
                 _commandList.Ptr->ClearDepthStencilView(depthStencilView, D3D12_CLEAR_FLAG_DEPTH,
                 1, 0, 0, null);

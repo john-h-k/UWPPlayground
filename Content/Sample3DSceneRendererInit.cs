@@ -2,7 +2,6 @@
 using System.Diagnostics;
 using System.IO;
 using System.Numerics;
-using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -10,54 +9,83 @@ using TerraFX.Interop;
 using UWPPlayground.Common;
 using UWPPlayground.Common.d3dx12;
 using static TerraFX.Interop.DXGI_FORMAT;
+using static TerraFX.Interop.D3D12_DESCRIPTOR_RANGE_TYPE;
+using static TerraFX.Interop.D3D_ROOT_SIGNATURE_VERSION;
+using static TerraFX.Interop.D3D12_SHADER_VISIBILITY;
+using static TerraFX.Interop.D3D12_ROOT_SIGNATURE_FLAGS;
 using static TerraFX.Interop.D3D12_INPUT_CLASSIFICATION;
 using static UWPPlayground.Common.d3dx12.CD3DX12_DEFAULT;
-using static UWPPlayground.Common.DirectXHelper;
 using static TerraFX.Interop.D3D12;
-using UWPPlayground.Content;
-
+using static TerraFX.Interop.D3DCompiler;
+using static TerraFX.Interop.D3D12_COMMAND_LIST_TYPE;
+using static TerraFX.Interop.D3D12_DESCRIPTOR_HEAP_FLAGS;
+using static TerraFX.Interop.D3D12_DESCRIPTOR_HEAP_TYPE;
+using static TerraFX.Interop.D3D12_HEAP_FLAGS;
+using static TerraFX.Interop.D3D12_HEAP_TYPE;
+using static TerraFX.Interop.D3D12_PRIMITIVE_TOPOLOGY_TYPE;
+using static TerraFX.Interop.D3D12_RESOURCE_STATES;
+using static TerraFX.Interop.DX;
+using static UWPPlayground.Common.DeviceResources;
 using D3D12_GPU_VIRTUAL_ADDRESS = System.UInt64;
+
 
 namespace UWPPlayground.Content
 {
     public partial class Sample3DSceneRenderer
     {
-        public static void CopyBytesToBlob(out ComPtrField<ID3DBlob> blob, UIntPtr size, byte[] bytes)
+        private unsafe void CreateDeviceDependentResourcesInternal()
+        {
+            ID3D12Device* d3dDevice = _deviceResources.D3DDevice;
+
+            {
+                D3D12_DESCRIPTOR_RANGE range =
+                    CD3DX12_DESCRIPTOR_RANGE.Create(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+                CD3DX12_ROOT_PARAMETER.InitAsDescriptorTable(out D3D12_ROOT_PARAMETER parameter, 1, &range, D3D12_SHADER_VISIBILITY_VERTEX);
+
+                D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
+                    D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | // Only the input assembler stage needs access to the constant buffer.
+                    D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+                    D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+                    D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+                    D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
+
+                CD3DX12_ROOT_SIGNATURE_DESC.Init(out D3D12_ROOT_SIGNATURE_DESC descRootSignature, 1, &parameter, 0, null, rootSignatureFlags);
+
+                var pSignature = new ComPtr<ID3DBlob>();
+                var pError = new ComPtr<ID3DBlob>();
+
+                ThrowIfFailed(D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, pSignature.GetAddressOf(), pError.GetAddressOf()));
+
+                Guid iid = IID_ID3D12RootSignature;
+                ID3D12RootSignature* rootSignature;
+                ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature.Ptr->GetBufferPointer(), pSignature.Ptr->GetBufferSize(), &iid, (void**)&rootSignature));
+                _rootSignature = rootSignature;
+                NameD3D12Object(_rootSignature.Ptr, nameof(_rootSignature));
+            }
+
+
+        }
+
+        #region Helper
+
+        private static unsafe void CopyBytesToBlob(out ID3DBlob* blob, UIntPtr size, byte[] bytes)
         {
             Span<byte> span = CreateBlob(out blob, size);
             bytes.CopyTo(span);
         }
 
-        public async Task ReadVertexShader()
-        {
-            const string fileName = "SampleVertexShader.cso";
-
-            var size = (UIntPtr)new FileInfo(fileName).Length;
-            byte[] shader = await File.ReadAllBytesAsync(fileName);
-            CopyBytesToBlob(out _vertexShader, size, shader);
-        }
-
-        public async Task ReadPixelShader()
-        {
-            const string fileName = "SamplePixelShader.cso";
-
-            var size = (UIntPtr)new FileInfo(fileName).Length;
-            byte[] shader = await File.ReadAllBytesAsync(fileName);
-            CopyBytesToBlob(out _pixelShader, size, shader);
-        }
-
-        private static unsafe Span<byte> CreateBlob(out ComPtrField<ID3DBlob> ppBlob, UIntPtr size)
+        private static unsafe Span<byte> CreateBlob(out ID3DBlob* ppBlob, UIntPtr size)
         {
 #if DEBUG
             ppBlob = null;
 #endif
             ID3DBlob* p;
 
-            ThrowIfFailed(D3DCompiler.D3DCreateBlob(size, &p));
+            ThrowIfFailed(D3DCreateBlob(size, &p));
 
             ppBlob = p;
 
-            return new Span<byte>(ppBlob.Ptr->GetBufferPointer(), (int)ppBlob.Ptr->GetBufferSize());
+            return new Span<byte>(ppBlob->GetBufferPointer(), (int)ppBlob->GetBufferSize());
         }
 
         private unsafe void CreatePipelineDescAndPipelineState()
@@ -126,7 +154,7 @@ namespace UWPPlayground.Content
             state.BlendState = CD3DX12_BLEND_DESC.Create(D3D12_DEFAULT);
             state.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC.Create(D3D12_DEFAULT);
             state.SampleMask = uint.MaxValue;
-            state.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE.D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+            state.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
             state.NumRenderTargets = 1;
             state.RTVFormats = default; // TODO redundant init - any solution?
             state.RTVFormats[0] = _deviceResources.BackBufferFormat;
@@ -146,7 +174,7 @@ namespace UWPPlayground.Content
             }
         }
 
-        public async Task CreatePipelineState(Task vertexShaderTask, Task pixelShaderTask)
+        private async Task CreatePipelineState(Task vertexShaderTask, Task pixelShaderTask)
         {
             await vertexShaderTask;
             await pixelShaderTask;
@@ -154,7 +182,7 @@ namespace UWPPlayground.Content
             CreatePipelineDescAndPipelineState();
         }
 
-        public async Task CreateRendererAssets(Task pipelineTask)
+        private async Task CreateRendererAssets(Task pipelineTask)
         {
             await pipelineTask;
             CreateAssets();
@@ -172,14 +200,14 @@ namespace UWPPlayground.Content
                 ID3D12GraphicsCommandList* commandList;
                 ThrowIfFailed(d3dDevice->CreateCommandList(
                     0,
-                    D3D12_COMMAND_LIST_TYPE.D3D12_COMMAND_LIST_TYPE_DIRECT,
+                    D3D12_COMMAND_LIST_TYPE_DIRECT,
                     _deviceResources.CommandAllocator,
                     _pipelineState.Ptr,
                     &iid,
                     (void**)&commandList));
 
                 _commandList = commandList;
-                NameObject(_commandList, nameof(_commandList));
+                NameD3D12Object(_commandList.Ptr, nameof(_commandList));
             }
 
             // Cube vertices. Each vertex has a position and a color.
@@ -195,6 +223,7 @@ namespace UWPPlayground.Content
                 new VertexPositionColor { pos = new Vector3(0.5f, 0.5f, -0.5f), color = new Vector3(1.0f, 1.0f, 0.0f) },
                 new VertexPositionColor { pos = new Vector3(0.5f, 0.5f, 0.5f), color = new Vector3(1.0f, 1.0f, 1.0f) }
             };
+            Debug.Assert(sizeof(VertexPositionColor) == Marshal.SizeOf<VertexPositionColor>());
             uint vertexBufferSize = (uint)sizeof(VertexPositionColor) * vertexPositionColorCount;
 
             using ComPtr<ID3D12Resource> vertexBufferUpload = default;
@@ -209,9 +238,9 @@ namespace UWPPlayground.Content
                 ID3D12Resource* vertexBuffer;
                 ThrowIfFailed(d3dDevice->CreateCommittedResource(
                     &defaultHeapProperties,
-                    D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
+                    D3D12_HEAP_FLAG_NONE,
                     &vertexBufferDesc,
-                    D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_COPY_DEST,
+                    D3D12_RESOURCE_STATE_COPY_DEST,
                     null,
                     &iid,
                     (void**)&vertexBuffer));
@@ -221,18 +250,18 @@ namespace UWPPlayground.Content
 
             iid = IID_ID3D12Resource;
             D3D12_HEAP_PROPERTIES uploadHeapProperties =
-                CD3DX12_HEAP_PROPERTIES.Create(D3D12_HEAP_TYPE.D3D12_HEAP_TYPE_UPLOAD);
+                CD3DX12_HEAP_PROPERTIES.Create(D3D12_HEAP_TYPE_UPLOAD);
 
             ThrowIfFailed(d3dDevice->CreateCommittedResource(
                 &uploadHeapProperties,
-                D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
+                D3D12_HEAP_FLAG_NONE,
                 &vertexBufferDesc,
-                D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_GENERIC_READ,
+                D3D12_RESOURCE_STATE_GENERIC_READ,
                 null,
                 &iid,
                 (void**)vertexBufferUpload.GetAddressOf()));
 
-            NameObject(_vertexBuffer, nameof(_vertexBuffer));
+            NameD3D12Object(_vertexBuffer.Ptr, nameof(_vertexBuffer));
 
             {
                 D3D12_SUBRESOURCE_DATA vertexData;
@@ -249,8 +278,8 @@ namespace UWPPlayground.Content
 
                 D3D12_RESOURCE_BARRIER vertexBufferResourceBarrier =
                     CD3DX12_RESOURCE_BARRIER.Transition(_vertexBuffer.Ptr,
-                        D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_COPY_DEST,
-                        D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+                        D3D12_RESOURCE_STATE_COPY_DEST,
+                        D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
                 _commandList.Ptr->ResourceBarrier(1, &vertexBufferResourceBarrier);
             }
@@ -311,9 +340,9 @@ namespace UWPPlayground.Content
                 ID3D12Resource* indexBuffer;
                 ThrowIfFailed(d3dDevice->CreateCommittedResource(
                     &defaultHeapProperties,
-                    D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
+                    D3D12_HEAP_FLAG_NONE,
                     &indexBufferDesc,
-                    D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_COPY_DEST,
+                    D3D12_RESOURCE_STATE_COPY_DEST,
                     null,
                     &iid,
                     (void**)&indexBuffer));
@@ -323,14 +352,14 @@ namespace UWPPlayground.Content
             iid = IID_ID3D12Resource;
             ThrowIfFailed(d3dDevice->CreateCommittedResource(
                 &uploadHeapProperties,
-                D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
+                D3D12_HEAP_FLAG_NONE,
                 &indexBufferDesc,
-                D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_GENERIC_READ,
+                D3D12_RESOURCE_STATE_GENERIC_READ,
                 null,
                 &iid,
                 (void**)indexBufferUpload.GetAddressOf()));
 
-            NameObject(_indexBuffer, nameof(_indexBuffer));
+            NameD3D12Object(_indexBuffer.Ptr, nameof(_indexBuffer));
 
             {
                 D3D12_SUBRESOURCE_DATA indexData;
@@ -347,52 +376,52 @@ namespace UWPPlayground.Content
 
                 D3D12_RESOURCE_BARRIER indexBufferResourceBarrier =
                     CD3DX12_RESOURCE_BARRIER.Transition(_indexBuffer.Ptr,
-                        D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_COPY_DEST,
-                        D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_INDEX_BUFFER);
+                        D3D12_RESOURCE_STATE_COPY_DEST,
+                        D3D12_RESOURCE_STATE_INDEX_BUFFER);
 
                 _commandList.Ptr->ResourceBarrier(1, &indexBufferResourceBarrier);
             }
 
             {
                 D3D12_DESCRIPTOR_HEAP_DESC heapDesc;
-                heapDesc.NumDescriptors = DeviceResources.FrameCount;
-                heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE.D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-                heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAGS.D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+                heapDesc.NumDescriptors = FrameCount;
+                heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+                heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
                 {
                     ID3D12DescriptorHeap* cbvHeap;
                     iid = IID_ID3D12DescriptorHeap;
                     ThrowIfFailed(d3dDevice->CreateDescriptorHeap(&heapDesc, &iid, (void**)&cbvHeap));
                     _cbvHeap = cbvHeap;
-                    NameObject(_cbvHeap, nameof(_cbvHeap));
+                    NameD3D12Object(_cbvHeap.Ptr, nameof(_cbvHeap));
                 }
             }
 
             D3D12_RESOURCE_DESC constantBufferDesc = CD3DX12_RESOURCE_DESC.Buffer(
                 DeviceResources.FrameCount * AlignedConstantBufferSize);
 
-            ID3D12Resource* constantBuffer;
             {
                 iid = IID_ID3D12Resource;
+                ID3D12Resource* constantBuffer;
                 ThrowIfFailed(d3dDevice->CreateCommittedResource(
                     &uploadHeapProperties,
-                    D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
+                    D3D12_HEAP_FLAG_NONE,
                     &constantBufferDesc,
-                    D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_GENERIC_READ,
+                    D3D12_RESOURCE_STATE_GENERIC_READ,
                     null,
                     &iid,
                     (void**)&constantBuffer));
                 _constantBuffer = constantBuffer;
 
-                NameObject(_constantBuffer, nameof(_constantBuffer));
+                NameD3D12Object(_constantBuffer.Ptr, nameof(_constantBuffer));
             }
 
             D3D12_GPU_VIRTUAL_ADDRESS cbvGpuAddress = _constantBuffer.Ptr->GetGPUVirtualAddress();
             D3D12_CPU_DESCRIPTOR_HANDLE cbvCpuHandle;
             _cbvHeap.Ptr->GetCPUDescriptorHandleForHeapStart(&cbvCpuHandle);
             _cbvDescriptorSize =
-                d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE
-                    .D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                d3dDevice->GetDescriptorHandleIncrementSize(
+                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
             for (var i = 0; i < DeviceResources.FrameCount; i++)
             {
@@ -431,5 +460,6 @@ namespace UWPPlayground.Content
 
             _deviceResources.WaitForGpu();
         }
+        #endregion
     }
 }

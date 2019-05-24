@@ -796,18 +796,24 @@ namespace UWPPlayground.Common
         public uint CurrentFrameIndex => (uint)_currentFrame;
         public CoreWindow Window => _window;
 
-        public D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTargetView()
+        public D3D12_CPU_DESCRIPTOR_HANDLE RenderTargetView
         {
-            D3D12_CPU_DESCRIPTOR_HANDLE handle;
-            _rtvHeap.Ptr->GetCPUDescriptorHandleForHeapStart(&handle);
-            return CD3DX12_CPU_DESCRIPTOR_HANDLE.Create(handle, _currentFrame, _rtvDescriptorSize);
+            get
+            {
+                D3D12_CPU_DESCRIPTOR_HANDLE handle;
+                _rtvHeap.Ptr->GetCPUDescriptorHandleForHeapStart(&handle);
+                return CD3DX12_CPU_DESCRIPTOR_HANDLE.Create(handle, _currentFrame, _rtvDescriptorSize);
+            }
         }
 
-        public D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView()
+        public D3D12_CPU_DESCRIPTOR_HANDLE DepthStencilView
         {
-            D3D12_CPU_DESCRIPTOR_HANDLE handle;
-            _dsvHeap.Ptr->GetCPUDescriptorHandleForHeapStart(&handle);
-            return handle;
+            get
+            {
+                D3D12_CPU_DESCRIPTOR_HANDLE handle;
+                _dsvHeap.Ptr->GetCPUDescriptorHandleForHeapStart(&handle);
+                return handle;
+            }
         }
 
         private void ReleaseUnmanagedResources()

@@ -21,7 +21,7 @@ namespace UWPPlayground.Common.d3dx12
         {
             var obj = new D3D12_CLEAR_VALUE { DepthStencil = default, Format = format };
 
-            Unsafe.CopyBlockUnaligned(ref Unsafe.As<float, byte>(ref obj.Color[0]), ref Unsafe.As<Vector4, byte>(ref color), (uint)sizeof(float) * 4);
+            Unsafe.WriteUnaligned(ref Unsafe.As<float, byte>(ref *obj.Color), color);
 
             return obj;
         }
@@ -35,7 +35,7 @@ namespace UWPPlayground.Common.d3dx12
 
             obj.Format = format;
             obj.DepthStencil = default;
-            Unsafe.CopyBlockUnaligned(ref Unsafe.As<float, byte>(ref obj.DepthStencil.Depth), ref Unsafe.As<float, byte>(ref depth), sizeof(float));
+            obj.DepthStencil.Depth = depth;
             obj.DepthStencil.Stencil = stencil;
 
             return obj;

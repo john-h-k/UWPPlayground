@@ -11,8 +11,8 @@
     <AssemblyName>UWPPlayground</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>
     <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
-    <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.17134.0</TargetPlatformVersion>
-    <TargetPlatformMinVersion>10.0.17134.0</TargetPlatformMinVersion>
+    <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.18362.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.18362.0</TargetPlatformMinVersion>
     <MinimumVisualStudioVersion>14</MinimumVisualStudioVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{A5A43C5B-DE2A-4C0C-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -48,10 +48,12 @@
     <DefineConstants>DEBUG;TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
     <NoWarn>;2008</NoWarn>
     <DebugType>full</DebugType>
-    <PlatformTarget>ARM</PlatformTarget>
+    <PlatformTarget>x64</PlatformTarget>
     <UseVSHostingProcess>false</UseVSHostingProcess>
     <ErrorReport>prompt</ErrorReport>
     <Prefer32Bit>true</Prefer32Bit>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>preview</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|ARM'">
     <OutputPath>bin\ARM\Release\</OutputPath>
@@ -102,6 +104,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <WarningLevel>1</WarningLevel>
     <LangVersion>preview</LangVersion>
+    <UseDotNetNativeToolchain>false</UseDotNetNativeToolchain>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutputPath>bin\x64\Release\</OutputPath>
@@ -148,8 +151,13 @@
     <Compile Include="Common\DeviceResources.cs" />
     <Compile Include="Common\DirectXHelper.cs" />
     <Compile Include="Common\Errors.cs" />
+    <Compile Include="Common\Helpers\DirectX.Detail.cs" />
+    <Compile Include="Common\Helpers\DirectXHelper.cs" />
+    <Compile Include="Common\Helpers\PIX.cs" />
+    <Compile Include="Common\Ptr.cs" />
     <Compile Include="Common\StepTimer.cs" />
     <Compile Include="Common\ThrowHelper.cs" />
+    <Compile Include="Content\Renderer.cs" />
     <Compile Include="Content\Sample3DSceneRenderer.cs" />
     <Compile Include="Content\Sample3DSceneRendererHelper.cs" />
     <Compile Include="Content\ShaderStructures.cs" />
@@ -163,8 +171,8 @@
     <None Include="UWPPlayground_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Content\SamplePixelShader.hlsl" />
-    <Content Include="Content\SampleVertexShader.hlsl" />
+    <None Include="Content\SamplePixelShader.hlsl" />
+    <None Include="Content\SampleVertexShader.hlsl" />
     <Content Include="Properties\Default.rd.xml" />
     <Content Include="Assets\LockScreenLogo.scale-200.png" />
     <Content Include="Assets\SplashScreen.scale-200.png" />
@@ -182,36 +190,26 @@
       <Version>4.5.3</Version>
     </PackageReference>
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe">
-      <Version>4.6.0-preview6.19259.10</Version>
-    </PackageReference>
-    <PackageReference Include="System.Runtime.Extensions">
-      <Version>4.3.1</Version>
+      <Version>4.5.2</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="TerraFX, Version=0.1.0.0, Culture=neutral, PublicKeyToken=35b01b53313a6f7e, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\terrafx\artifacts\bin\sources\TerraFX.Provider.D3D12\Debug\netcoreapp3.0\TerraFX.dll</HintPath>
+    <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform">
+      <Version>6.2.8</Version>
+    </PackageReference>
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe">
+      <Version>4.6.0-preview6.19259.10</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="TerraFX.Interop.Windows">
+      <HintPath>..\..\Repos\terrafx\artifacts\bin\sources\TerraFX.Interop.Windows\Debug\netcoreapp2.1\TerraFX.Interop.Windows.dll</HintPath>
     </Reference>
-    <Reference Include="TerraFX.Graphics, Version=0.1.0.0, Culture=neutral, PublicKeyToken=35b01b53313a6f7e, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\terrafx\artifacts\bin\sources\TerraFX.Provider.D3D12\Debug\netcoreapp3.0\TerraFX.Graphics.dll</HintPath>
+    <Reference Include="TerraFX.Resources">
+      <HintPath>..\..\Repos\terrafx\artifacts\bin\sources\TerraFX.Interop.Windows\Debug\netcoreapp2.1\TerraFX.Resources.dll</HintPath>
     </Reference>
-    <Reference Include="TerraFX.Interop.Windows, Version=0.1.0.0, Culture=neutral, PublicKeyToken=35b01b53313a6f7e, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\terrafx\artifacts\bin\sources\TerraFX.Provider.D3D12\Debug\netcoreapp3.0\TerraFX.Interop.Windows.dll</HintPath>
-    </Reference>
-    <Reference Include="TerraFX.Provider.D3D12, Version=0.1.0.0, Culture=neutral, PublicKeyToken=35b01b53313a6f7e, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\terrafx\artifacts\bin\sources\TerraFX.Provider.D3D12\Debug\netcoreapp3.0\TerraFX.Provider.D3D12.dll</HintPath>
-    </Reference>
-    <Reference Include="TerraFX.Resources, Version=0.1.0.0, Culture=neutral, PublicKeyToken=35b01b53313a6f7e, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\terrafx\artifacts\bin\sources\TerraFX.Provider.D3D12\Debug\netcoreapp3.0\TerraFX.Resources.dll</HintPath>
-    </Reference>
-    <Reference Include="TerraFX.Utilities, Version=0.1.0.0, Culture=neutral, PublicKeyToken=35b01b53313a6f7e, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\terrafx\artifacts\bin\sources\TerraFX.Provider.D3D12\Debug\netcoreapp3.0\TerraFX.Utilities.dll</HintPath>
+    <Reference Include="TerraFX.Utilities">
+      <HintPath>..\..\Repos\terrafx\artifacts\bin\sources\TerraFX.Interop.Windows\Debug\netcoreapp2.1\TerraFX.Utilities.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
