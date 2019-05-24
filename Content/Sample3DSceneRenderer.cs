@@ -4,6 +4,7 @@ using TerraFX.Interop;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.UserDataTasks;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Storage;
@@ -88,34 +89,33 @@ namespace UWPPlayground.Content
         {
             CreateDeviceDependentResourcesInternal();
 
-            async Task ReadVertexShader()
+            Task vertexShaderRead = Task.Run(async () =>
             {
                 const string fileName = "SampleVertexShader.cso";
 
-                var size = (UIntPtr) new FileInfo(fileName).Length;
+                var size = (UIntPtr)new FileInfo(fileName).Length;
                 byte[] shader = await File.ReadAllBytesAsync(fileName);
 
                 unsafe
                 {
                     CopyBytesToBlob(out _vertexShader.GetPinnableReference(), size, shader);
                 }
-            }
+            });
 
-            async Task PixelShader()
+            Task pixelShaderRead = Task.Run(async () =>
             {
                 const string fileName = "SamplePixelShader.cso";
 
-                var size = (UIntPtr) new FileInfo(fileName).Length;
+                var size = (UIntPtr)new FileInfo(fileName).Length;
                 byte[] shader = await File.ReadAllBytesAsync(fileName);
 
                 unsafe
                 {
                     CopyBytesToBlob(out _pixelShader.GetPinnableReference(), size, shader);
                 }
-            }
+            });
 
-            Task psoTask = CreatePipelineState(ReadVertexShader(), PixelShader());
-            await CreateRendererAssets(psoTask);
+            await CreatePipelineState(vertexShaderRead, pixelShaderRead).ContinueWith(CreateRendererAssets);
         }
 
 
@@ -211,7 +211,7 @@ namespace UWPPlayground.Content
                 D3D12_CPU_DESCRIPTOR_HANDLE renderTargetView = _deviceResources.RenderTargetView;
                 D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = _deviceResources.DepthStencilView;
 
-                
+
                 _commandList.Ptr->ClearRenderTargetView(renderTargetView, CornflowerBlue, 0, null);
                 _commandList.Ptr->ClearDepthStencilView(depthStencilView, D3D12_CLEAR_FLAG_DEPTH,
                 1, 0, 0, null);

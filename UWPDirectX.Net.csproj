@@ -159,7 +159,7 @@
     <Compile Include="Common\ThrowHelper.cs" />
     <Compile Include="Content\Renderer.cs" />
     <Compile Include="Content\Sample3DSceneRenderer.cs" />
-    <Compile Include="Content\Sample3DSceneRendererHelper.cs" />
+    <Compile Include="Content\Sample3DSceneRendererInit.cs" />
     <Compile Include="Content\ShaderStructures.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="UWPDirectXMain.cs" />
